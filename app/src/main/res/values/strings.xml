@@ -58,6 +58,24 @@
     <string name="notification_channel_description">Monitoreo activo de ofertas de Uber Driver</string>
     <string name="notification_title">UberMax Activo</string>
     <string name="notification_text">Monitoreando ofertas de Uber Driver</string>
+    <string name="hud_notification_title">UberMax HUD</string>
+    <string name="hud_notification_text">HUD de decisiones activo</string>
+
+    <!-- HUD — decisión y motivos -->
+    <string name="hud_accepted">ACEPTADO</string>
+    <string name="hud_rejected">RECHAZADO</string>
+    <string name="hud_no_destination">Sin destino</string>
+    <string name="hud_reason_accepted">Rentabilidad suficiente</string>
+    <string name="hud_reason_blacklist">Zona en lista negra</string>
+    <string name="hud_reason_low_fare">Tarifa muy baja</string>
+    <string name="hud_reason_low_net">Ganancia neta insuficiente</string>
+    <string name="hud_reason_low_per_km">Rentabilidad por km baja</string>
+    <string name="hud_reason_low_per_hour">Rentabilidad por hora baja</string>
+    <string name="hud_reason_pickup_far">Recogida muy lejana</string>
+    <string name="hud_reason_trip_long">Viaje demasiado largo</string>
+    <string name="hud_reason_low_rating">Pasajero de bajo rating</string>
+    <string name="hud_reason_deadhead">Vuelta vacía larga</string>
+    <string name="hud_reason_auto_accept_off">Auto-aceptación desactivada</string>
 
     <!-- General -->
     <string name="enable_accessibility">Habilitar Servicio de Accesibilidad</string>

@@ -67,10 +67,11 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
-        <!-- Floating Window (HUD) -->
+        <!-- Floating Window (HUD) — foreground para no ser destruido bajo baja memoria -->
         <service
             android:name=".service.FloatingWindowService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
 
     </application>
 

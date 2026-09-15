@@ -1,7 +1,9 @@
 package com.ubermax.app.service
 
+import android.app.Notification
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.IBinder
 import android.view.Gravity
@@ -10,7 +12,10 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
+import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.ubermax.app.R
+import com.ubermax.app.UberMaxApplication
 import com.ubermax.app.domain.model.Action
 import com.ubermax.app.domain.model.OfferDecision
 import dagger.hilt.android.AndroidEntryPoint
@@ -18,19 +23,19 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 
 /**
- * FloatingWindowService — HUD overlay compacto con métricas de rentabilidad,
- * destino del pasajero, y warnings/recomendaciones.
+ * FloatingWindowService — HUD flotante minimalista para conducción.
  *
- * Muestra:
- * - Decisión: ✅ ACEPTADO / ⚠️ NO RECOMENDABLE / 🚫 CANCELANDO / ⏳ ESPERANDO
- * - Ganancia neta
- * - Destino del pasajero (prominente)
- * - Distancias (pickup + trip)
- * - Costo combustible
- * - Métricas de rentabilidad ($/km, $/hr)
- * - Rating pasajero
- * - Warnings detallados (qué filtros fallaron)
- * - Recomendación IA (si activada)
+ * Muestra únicamente 4 datos de alto contraste:
+ *  - Ganancia neta (ej: "$4.20 neta")
+ *  - Tarifa por km (ej: "$0.85/km")
+ *  - Destino/Sector abreviado
+ *  - Badge de decisión ACEPTADO/RECHAZADO + motivo principal en una línea
+ *
+ * Auto-colapso inteligente: 6 segundos después de cada decisión la ventana
+ * se contrae a una burbuja mínima no intrusiva. Tocar la burbuja la expande.
+ *
+ * Corre como servicio en primer plano (foreground) para no ser destruido bajo
+ * baja memoria mientras Uber Driver está en pantalla.
  */
 @AndroidEntryPoint
 class FloatingWindowService : Service() {
@@ -38,12 +43,15 @@ class FloatingWindowService : Service() {
     companion object {
         const val ACTION_SHOW = "com.ubermax.ACTION_SHOW_HUD"
         const val ACTION_HIDE = "com.ubermax.ACTION_HIDE_HUD"
+        const val NOTIFICATION_ID = 1002
+        private const val AUTO_COLLAPSE_DELAY_MS = 6_000L
         var isShowing = false
     }
 
     private var windowManager: WindowManager? = null
     private var floatingView: View? = null
     private var isCollapsed = false
+    private var collapseJob: Job? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -57,6 +65,7 @@ class FloatingWindowService : Service() {
         when (intent?.action) {
             ACTION_HIDE -> {
                 removeOverlay()
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -64,11 +73,39 @@ class FloatingWindowService : Service() {
                 if (floatingView == null) {
                     createOverlay()
                     observeDecisions()
+                    scheduleAutoCollapse()
                 }
+                startAsForeground()
             }
         }
         return START_STICKY
     }
+
+    override fun onDestroy() {
+        collapseJob?.cancel()
+        serviceScope.cancel()
+        removeOverlay()
+        super.onDestroy()
+    }
+
+    private fun startAsForeground() {
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            createNotification(),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        )
+    }
+
+    private fun createNotification(): Notification =
+        NotificationCompat.Builder(this, UberMaxApplication.NOTIFICATION_CHANNEL_ID)
+            .setContentTitle(getString(R.string.hud_notification_title))
+            .setContentText(getString(R.string.hud_notification_text))
+            .setSmallIcon(R.drawable.ic_notification)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
 
     private fun createOverlay() {
         val inflater = LayoutInflater.from(this)
@@ -87,39 +124,40 @@ class FloatingWindowService : Service() {
             y = 100
         }
 
-        setupDragAndCollapse(params)
+        setupDragAndTap(params)
         windowManager?.addView(floatingView, params)
         isShowing = true
     }
 
-    private fun setupDragAndCollapse(params: WindowManager.LayoutParams) {
+    /** Arrastrar mueve la ventana; un toque (sin arrastre) alterna colapsado/expandido. */
+    private fun setupDragAndTap(params: WindowManager.LayoutParams) {
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
-        var isClick = true
+        var isTap = true
 
-        floatingView?.findViewById<View>(R.id.hud_header)?.setOnTouchListener { _, event ->
+        floatingView?.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
-                    isClick = true
+                    isTap = true
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val deltaX = (event.rawX - initialTouchX).toInt()
                     val deltaY = (event.rawY - initialTouchY).toInt()
-                    if (deltaX * deltaX + deltaY * deltaY > 100) isClick = false
+                    if (deltaX * deltaX + deltaY * deltaY > 100) isTap = false
                     params.x = initialX + deltaX
                     params.y = initialY + deltaY
                     windowManager?.updateViewLayout(floatingView, params)
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (isClick) toggleCollapse()
+                    if (isTap) toggleCollapse()
                     true
                 }
                 else -> false
@@ -128,9 +166,35 @@ class FloatingWindowService : Service() {
     }
 
     private fun toggleCollapse() {
-        isCollapsed = !isCollapsed
-        floatingView?.findViewById<View>(R.id.expanded_content)?.visibility =
-            if (isCollapsed) View.GONE else View.VISIBLE
+        if (isCollapsed) expand() else collapse()
+    }
+
+    private fun collapse() {
+        collapseJob?.cancel()
+        isCollapsed = true
+        setCollapsedVisibility(true)
+    }
+
+    private fun expand() {
+        collapseJob?.cancel()
+        isCollapsed = false
+        setCollapsedVisibility(false)
+    }
+
+    private fun setCollapsedVisibility(collapsed: Boolean) {
+        val view = floatingView ?: return
+        view.findViewById<View>(R.id.expanded_content)?.visibility =
+            if (collapsed) View.GONE else View.VISIBLE
+        view.findViewById<View>(R.id.collapsed_content)?.visibility =
+            if (collapsed) View.VISIBLE else View.GONE
+    }
+
+    private fun scheduleAutoCollapse() {
+        collapseJob?.cancel()
+        collapseJob = serviceScope.launch {
+            delay(AUTO_COLLAPSE_DELAY_MS)
+            collapse()
+        }
     }
 
     private fun observeDecisions() {
@@ -145,94 +209,96 @@ class FloatingWindowService : Service() {
         val view = floatingView ?: return
         val offer = decision.evaluatedOffer.offer
         val eval = decision.evaluatedOffer
+        val action = decision.action
 
-        // ── Decisión (badge superior) ──
-        val tvDecision = view.findViewById<TextView>(R.id.tv_decision)
-        when (decision.action) {
+        updateDecisionBadge(view, action)
+        updateReason(view, decision, action)
+        updateNetProfit(view, eval.netProfit)
+        view.findViewById<TextView>(R.id.tv_profit_per_km)?.text = "\$%.2f/km".format(eval.profitPerKm)
+        updateDestination(view, offer.destination)
+
+        val symbol = if (action == Action.ACCEPT) "✅" else "❌"
+        view.findViewById<TextView>(R.id.tv_collapsed)?.text = "$symbol \$%.2f".format(eval.netProfit)
+
+        if (action != Action.IGNORE) {
+            expand()
+            scheduleAutoCollapse()
+        }
+    }
+
+    private fun updateDecisionBadge(view: View, action: Action) {
+        val badge = view.findViewById<TextView>(R.id.tv_decision)
+        when (action) {
             Action.ACCEPT -> {
-                tvDecision.text = "✅ ACEPTADO"
-                tvDecision.setTextColor(getColor(R.color.hud_accept))
+                badge.text = "✅ ${getString(R.string.hud_accepted)}"
+                badge.setBackgroundResource(R.drawable.hud_badge_accept)
             }
             Action.WARN -> {
-                tvDecision.text = "⚠️ NO RECOMENDABLE"
-                tvDecision.setTextColor(getColor(R.color.warning))
+                badge.text = "❌ ${getString(R.string.hud_rejected)}"
+                badge.setBackgroundResource(R.drawable.hud_badge_reject)
             }
             Action.CANCEL -> {
-                tvDecision.text = "🚫 CANCELANDO"
-                tvDecision.setTextColor(getColor(R.color.hud_ignore))
+                badge.text = "❌ ${getString(R.string.hud_rejected)}"
+                badge.setBackgroundResource(R.drawable.hud_badge_reject)
             }
             Action.IGNORE -> {
-                tvDecision.text = "⏳ IGNORADO"
-                tvDecision.setTextColor(getColor(R.color.text_secondary))
+                badge.text = "⏸ ${getString(R.string.hud_rejected)}"
+                badge.setBackgroundResource(R.drawable.hud_badge_reject)
             }
         }
+    }
 
-        // ── Ganancia neta ──
+    private fun updateReason(view: View, decision: OfferDecision, action: Action) {
+        val tvReason = view.findViewById<TextView>(R.id.tv_reason)
+        val reason = mainReason(decision, action)
+        tvReason.text = reason
+        tvReason.visibility = if (reason.isBlank()) View.GONE else View.VISIBLE
+    }
+
+    /** Motivo principal de la decisión en una sola línea legible. */
+    private fun mainReason(decision: OfferDecision, action: Action): String {
+        if (action == Action.CANCEL) return getString(R.string.hud_reason_blacklist)
+        if (action == Action.ACCEPT) return getString(R.string.hud_reason_accepted)
+
+        val filter = decision.failedFilters.firstOrNull() ?: return ""
+        val text = filter.trim().replace(Regex("^[\\p{So}\\p{M}\\s]+"), "")
+        if (text.isEmpty()) return ""
+
+        return when {
+            text.contains("Tarifa baja", ignoreCase = true) -> getString(R.string.hud_reason_low_fare)
+            text.contains("Ganancia neta", ignoreCase = true) -> getString(R.string.hud_reason_low_net)
+            text.contains("\$/km bajo", ignoreCase = true) -> getString(R.string.hud_reason_low_per_km)
+            text.contains("\$/hr", ignoreCase = true) -> getString(R.string.hud_reason_low_per_hour)
+            text.contains("Pickup lejos", ignoreCase = true) -> getString(R.string.hud_reason_pickup_far)
+            text.contains("Viaje largo", ignoreCase = true) -> getString(R.string.hud_reason_trip_long)
+            text.contains("Tiempo largo", ignoreCase = true) -> getString(R.string.hud_reason_trip_long)
+            text.contains("Rating bajo", ignoreCase = true) -> getString(R.string.hud_reason_low_rating)
+            text.contains("Vuelta vacía", ignoreCase = true) -> getString(R.string.hud_reason_deadhead)
+            text.contains("LISTA NEGRA", ignoreCase = true) -> getString(R.string.hud_reason_blacklist)
+            text.contains("Auto-accept", ignoreCase = true) -> getString(R.string.hud_reason_auto_accept_off)
+            else -> text
+        }
+    }
+
+    private fun updateNetProfit(view: View, netProfit: Double) {
         val tvProfit = view.findViewById<TextView>(R.id.tv_net_profit)
-        val profitText = "💰 Ganancia: \$%.2f".format(eval.netProfit)
-        tvProfit.text = profitText
+        tvProfit.text = "\$%.2f neta".format(netProfit)
         tvProfit.setTextColor(
-            if (eval.netProfit > 0) getColor(R.color.profit_positive)
+            if (netProfit > 0) getColor(R.color.profit_positive)
             else getColor(R.color.profit_negative)
         )
+    }
 
-        // ── Destino del pasajero (prominente) ──
+    private fun updateDestination(view: View, destination: String) {
         val tvDest = view.findViewById<TextView>(R.id.tv_destination)
-        if (offer.destination.isNotEmpty()) {
-            tvDest.text = "📍 Destino: ${offer.destination}"
-            tvDest.visibility = View.VISIBLE
-        } else {
-            tvDest.text = "📍 Destino: no disponible"
-            tvDest.visibility = View.VISIBLE
-        }
+        val text = if (destination.isBlank()) getString(R.string.hud_no_destination)
+                   else abbreviate(destination)
+        tvDest.text = "📍 $text"
+    }
 
-        // ── Distancias ──
-        val tvDistances = view.findViewById<TextView>(R.id.tv_distances)
-        tvDistances.text = buildString {
-            append("🚶 Recogida: ${offer.pickupKm}km")
-            if (offer.pickupMinutes > 0) append(" (${offer.pickupMinutes}min)")
-            append(" | 🚗 Viaje: ${offer.tripKm}km")
-            if (offer.tripMinutes > 0) append(" (${offer.tripMinutes}min)")
-        }
-
-        // ── Costo combustible ──
-        val tvFuel = view.findViewById<TextView>(R.id.tv_fuel_cost)
-        tvFuel.text = "⛽ Combustible: \$%.2f".format(eval.fuelCost)
-
-        // ── Métricas de rentabilidad ──
-        val tvMetrics = view.findViewById<TextView>(R.id.tv_profit_metrics)
-        tvMetrics.text = "📊 \$%.2f/km | \$%.2f/hr".format(eval.profitPerKm, eval.profitPerHour)
-
-        // ── Rating pasajero ──
-        val tvRating = view.findViewById<TextView>(R.id.tv_rating)
-        tvRating.text = buildString {
-            append("⭐ ${offer.passengerRating}")
-            if (offer.passengerTrips > 0) append(" (${offer.passengerTrips} viajes)")
-            if (offer.rideType.isNotEmpty()) append(" | ${offer.rideType}")
-        }
-
-        // ── Warnings (filtros fallidos) ──
-        val tvWarnings = view.findViewById<TextView>(R.id.tv_warnings)
-        if (decision.failedFilters.isNotEmpty() && decision.action != Action.ACCEPT) {
-            tvWarnings.text = decision.failedFilters.joinToString("\n")
-            tvWarnings.visibility = View.VISIBLE
-        } else {
-            tvWarnings.visibility = View.GONE
-        }
-
-        // ── Recomendación IA ──
-        val tvAI = view.findViewById<TextView>(R.id.tv_ai_recommendation)
-        if (decision.aiRecommendation.isNotEmpty()) {
-            tvAI.text = "🧠 ${decision.aiRecommendation}"
-            tvAI.visibility = View.VISIBLE
-        } else {
-            tvAI.visibility = View.GONE
-        }
-
-        // Expandir si estaba colapsado para que el conductor vea los datos
-        if (isCollapsed && decision.action != Action.IGNORE) {
-            toggleCollapse()
-        }
+    private fun abbreviate(destination: String): String {
+        val first = destination.split(",", " - ").first().trim()
+        return if (first.length <= 22) first else first.take(20).trimEnd() + "…"
     }
 
     private fun removeOverlay() {
@@ -241,11 +307,5 @@ class FloatingWindowService : Service() {
             floatingView = null
         }
         isShowing = false
-    }
-
-    override fun onDestroy() {
-        serviceScope.cancel()
-        removeOverlay()
-        super.onDestroy()
     }
 }

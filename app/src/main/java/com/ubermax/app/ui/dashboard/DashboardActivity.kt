@@ -61,9 +61,10 @@ class DashboardActivity : AppCompatActivity() {
             })
 
         if (checkOverlayPermission()) {
-            startService(Intent(this, FloatingWindowService::class.java).apply {
-                action = FloatingWindowService.ACTION_SHOW
-            })
+            ContextCompat.startForegroundService(this,
+                Intent(this, FloatingWindowService::class.java).apply {
+                    action = FloatingWindowService.ACTION_SHOW
+                })
         }
 
         updateStatus()

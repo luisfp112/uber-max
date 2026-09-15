@@ -1,135 +1,134 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- HUD Overlay Layout — Ventana flotante con métricas y destino -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- HUD Overlay Layout — minimalista para conducción. Solo 4 datos:
+     1) Ganancia neta  2) $/km  3) Destino abreviado  4) Badge de decisión + motivo.
+     Estado colapsado = burbuja/pastilla compacta no intrusiva. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/hud_root"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:minWidth="280dp"
-    android:maxWidth="340dp"
-    android:orientation="vertical"
     android:background="@drawable/hud_background"
-    android:padding="12dp"
     android:elevation="8dp">
 
-    <!-- Drag Handle + Header -->
+    <!-- ══════════ Tarjeta expandida ══════════ -->
     <LinearLayout
-        android:id="@+id/hud_header"
-        android:layout_width="match_parent"
+        android:id="@+id/expanded_content"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:minWidth="250dp"
+        android:maxWidth="320dp"
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <View
-            android:id="@+id/hud_drag_handle"
-            android:layout_width="32dp"
-            android:layout_height="4dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/drag_handle" />
-
-        <TextView
-            android:layout_width="0dp"
+        <!-- Drag handle -->
+        <LinearLayout
+            android:id="@+id/hud_header"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="UberMax"
-            android:textColor="@color/primary"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingBottom="6dp">
 
+            <View
+                android:id="@+id/hud_drag_handle"
+                android:layout_width="32dp"
+                android:layout_height="4dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/drag_handle" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="UberMax"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Badge de decisión (ACEPTADO/RECHAZADO) -->
         <TextView
             android:id="@+id/tv_decision"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="⏳ ESPERANDO"
-            android:textColor="@color/text_secondary"
-            android:textSize="10sp"
+            android:background="@drawable/hud_badge_accept"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp"
+            android:text="✅ ACEPTADO"
+            android:textColor="@color/hud_badge_text"
+            android:textSize="18sp"
             android:textStyle="bold" />
-    </LinearLayout>
 
-    <!-- Expanded Content -->
-    <LinearLayout
-        android:id="@+id/expanded_content"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="6dp">
+        <!-- Motivo principal (una sola línea) -->
+        <TextView
+            android:id="@+id/tv_reason"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="@color/hud_border" />
+
+        <!-- Ganancia neta -->
         <TextView
             android:id="@+id/tv_net_profit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="💰 ---"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
+            android:text="--"
+            android:textColor="@color/profit_positive"
+            android:textSize="26sp"
             android:textStyle="bold" />
 
-        <!-- Destino del pasajero -->
+        <!-- Tarifa por kilómetro -->
+        <TextView
+            android:id="@+id/tv_profit_per_km"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="--"
+            android:textColor="@color/text_primary"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <!-- Destino abreviado -->
         <TextView
             android:id="@+id/tv_destination"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="📍 Esperando oferta..."
-            android:textColor="@color/primary"
-            android:textSize="12sp"
-            android:textStyle="bold"
             android:layout_marginTop="4dp"
-            android:maxLines="2"
-            android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/tv_distances"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📍 Esperando oferta..."
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:layout_marginTop="2dp" />
-
-        <TextView
-            android:id="@+id/tv_fuel_cost"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/warning"
-            android:textSize="12sp"
-            android:layout_marginTop="2dp" />
-
-        <TextView
-            android:id="@+id/tv_profit_metrics"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/info"
-            android:textSize="12sp"
-            android:layout_marginTop="2dp" />
-
-        <TextView
-            android:id="@+id/tv_rating"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:layout_marginTop="2dp" />
-
-        <!-- Warnings / Filtros fallidos -->
-        <TextView
-            android:id="@+id/tv_warnings"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/profit_negative"
-            android:textSize="11sp"
-            android:layout_marginTop="4dp"
-            android:maxLines="4"
             android:ellipsize="end"
-            android:visibility="gone" />
-
-        <!-- Recomendación IA -->
-        <TextView
-            android:id="@+id/tv_ai_recommendation"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/secondary"
-            android:textSize="11sp"
-            android:layout_marginTop="4dp"
-            android:visibility="gone" />
+            android:maxLines="1"
+            android:text="📍 --"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
 
     </LinearLayout>
 
-</LinearLayout>
+    <!-- ══════════ Burbuja colapsada (pastilla mínima) ══════════ -->
+    <LinearLayout
+        android:id="@+id/collapsed_content"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/hud_bubble_background"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_collapsed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UberMax"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</FrameLayout>
