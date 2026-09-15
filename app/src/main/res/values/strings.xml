@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UberMax</string>
+    <string name="accessibility_service_description">UberMax analiza las ofertas de viaje de Uber Driver para calcular rentabilidad neta y asistir en la toma de decisiones.</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Panel de Control</string>
+    <string name="today_earnings">Ganancias Hoy</string>
+    <string name="total_offers">Ofertas Recibidas</string>
+    <string name="accepted_offers">Aceptadas</string>
+    <string name="ignored_offers">Ignoradas</string>
+    <string name="avg_profit_km">Ganancia/Km Promedio</string>
+    <string name="avg_profit_hour">Ganancia/Hora Promedio</string>
+    <string name="best_zones">Mejores Zonas</string>
+    <string name="best_hours">Mejores Horarios</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Configuración</string>
+    <string name="vehicle_config">Configuración del Vehículo</string>
+    <string name="vehicle_name">Nombre del Vehículo</string>
+    <string name="cost_per_km">Costo por Km (combustible)</string>
+    <string name="avg_speed">Velocidad Promedio (km/h)</string>
+    <string name="idle_cost_hour">Costo Motor Ralentí (/hora)</string>
+    <string name="filter_rules">Reglas de Filtrado</string>
+    <string name="min_profit_km">Ganancia Mínima por Km</string>
+    <string name="min_profit_hour">Ganancia Mínima por Hora</string>
+    <string name="min_passenger_rating">Calificación Mínima Pasajero</string>
+    <string name="blacklist_enabled">Lista Negra Activa</string>
+    <string name="auto_accept_enabled">Auto-Aceptar Activo</string>
+    <string name="manage_blacklist">Administrar Lista Negra</string>
+    <string name="save">Guardar</string>
+    <string name="saved_successfully">Configuración guardada</string>
+
+    <!-- Blacklist -->
+    <string name="add_blacklist_entry">Agregar palabra clave</string>
+    <string name="keyword">Palabra clave</string>
+    <string name="type_sector">Sector</string>
+    <string name="type_street">Calle</string>
+    <string name="type_zone">Zona</string>
+    <string name="reason">Razón</string>
+    <string name="delete">Eliminar</string>
+
+    <!-- HUD -->
+    <string name="hud_net_profit">Ganancia Neta</string>
+    <string name="hud_fuel_cost">Costo Combustible</string>
+    <string name="hud_profit_km">$/Km</string>
+    <string name="hud_profit_hour">$/Hora</string>
+    <string name="hud_rating">Rating</string>
+    <string name="hud_auto_accepted">AUTO-ACEPTADO</string>
+    <string name="hud_ignored">IGNORADO</string>
+    <string name="hud_waiting">ESPERANDO OFERTA</string>
+    <string name="hud_zone_good">Zona actual: buena</string>
+    <string name="hud_zone_move">Moverse a zona activa</string>
+    <string name="hud_zone_stay">Permanecer aquí</string>
+
+    <!-- Service -->
+    <string name="notification_channel_name">UberMax Monitor</string>
+    <string name="notification_channel_description">Monitoreo activo de ofertas de Uber Driver</string>
+    <string name="notification_title">UberMax Activo</string>
+    <string name="notification_text">Monitoreando ofertas de Uber Driver</string>
+
+    <!-- General -->
+    <string name="enable_accessibility">Habilitar Servicio de Accesibilidad</string>
+    <string name="start_monitoring">Iniciar Monitoreo</string>
+    <string name="stop_monitoring">Detener Monitoreo</string>
+    <string name="export_csv">Exportar CSV</string>
+    <string name="no_data">Sin datos disponibles</string>
+</resources>

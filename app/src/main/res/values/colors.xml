@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UberMax Color Palette -->
+
+    <!-- Primary: Teal/Emerald gradient -->
+    <color name="primary">#FF00D4AA</color>
+    <color name="primary_variant">#FF00A88A</color>
+    <color name="primary_dark">#FF007A63</color>
+    <color name="on_primary">#FF000000</color>
+
+    <!-- Secondary: Purple accent -->
+    <color name="secondary">#FF7C4DFF</color>
+    <color name="secondary_variant">#FF6200EE</color>
+    <color name="on_secondary">#FFFFFFFF</color>
+
+    <!-- Background layers (dark theme) -->
+    <color name="bg_primary">#FF0D1117</color>
+    <color name="bg_secondary">#FF161B22</color>
+    <color name="bg_tertiary">#FF21262D</color>
+    <color name="bg_card">#FF1C2128</color>
+
+    <!-- Text colors -->
+    <color name="text_primary">#FFE6EDF3</color>
+    <color name="text_secondary">#FF8B949E</color>
+    <color name="text_tertiary">#FF6E7681</color>
+
+    <!-- Semantic colors -->
+    <color name="profit_positive">#FF00E676</color>
+    <color name="profit_negative">#FFFF5252</color>
+    <color name="warning">#FFFFAB40</color>
+    <color name="info">#FF448AFF</color>
+
+    <!-- HUD overlay -->
+    <color name="hud_background">#CC0D1117</color>
+    <color name="hud_border">#4400D4AA</color>
+    <color name="hud_accept">#FF00E676</color>
+    <color name="hud_ignore">#FFFF5252</color>
+
+    <!-- Chart colors -->
+    <color name="chart_line_1">#FF00D4AA</color>
+    <color name="chart_line_2">#FF7C4DFF</color>
+    <color name="chart_fill_1">#3300D4AA</color>
+    <color name="chart_fill_2">#337C4DFF</color>
+</resources>

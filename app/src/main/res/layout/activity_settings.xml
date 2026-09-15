@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_primary"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="20dp">
+            <ImageButton
+                android:id="@+id/btn_back"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_revert"
+                android:tint="@color/text_primary"
+                android:contentDescription="Volver" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Filtros Maxymo"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginStart="12dp" />
+        </LinearLayout>
+
+        <!-- ═══ VEHÍCULO ═══ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🚗 Vehículo"
+            android:textColor="@color/primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Nombre del vehículo"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_vehicle_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="text" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Costo por km (USD)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_cost_per_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Velocidad promedio (km/h)"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_avg_speed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ═══ FILTROS DE TARIFA ═══ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="💵 Filtros de Tarifa (USD)"
+            android:textColor="@color/secondary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Tarifa mínima ($)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_min_fare"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Mín $/km (tarifa bruta)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_min_fare_per_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Mín $/hora (tarifa bruta)"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_min_fare_per_hour"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ═══ FILTROS DE DISTANCIA ═══ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📍 Filtros de Distancia (km)"
+            android:textColor="@color/info"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Máx recogida (km)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_max_pickup_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Máx viaje (km)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_max_trip_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Máx minutos estimados"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_max_total_minutes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="number" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ═══ FILTROS DE PASAJERO ═══ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⭐ Pasajero"
+            android:textColor="@color/primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Rating mínimo (0=desactivado)"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_min_passenger_rating"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ═══ FILTROS DE GANANCIA NETA ═══ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="💰 Ganancia Neta (después combustible)"
+            android:textColor="@color/profit_positive"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Ganancia neta mínima ($)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_min_net_profit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Mín ganancia neta $/km"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_min_profit_per_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Mín ganancia neta $/hora"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_min_profit_per_hour"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ═══ TOGGLES ═══ -->
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_auto_accept"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Auto-aceptar ofertas aprobadas"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_blacklist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Lista negra activa"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_ai"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="SmartAdvisor IA (Recomendaciones)"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="16dp" />
+
+        <!-- ═══ LISTA NEGRA ═══ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🚫 Lista Negra (toca para eliminar)"
+            android:textColor="@color/profit_negative"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/blacklist_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_add_blacklist"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="+ Agregar dirección por texto"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/bg_tertiary"
+            android:textColor="@color/profit_negative"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_open_map"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="🗺️ Abrir Mapa de Zonas Excluidas"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/info"
+            android:textColor="@color/on_primary"
+            android:layout_marginBottom="16dp" />
+
+        <!-- SAVE -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_save"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="@string/save"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/on_primary"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginBottom="24dp" />
+
+    </LinearLayout>
+</ScrollView>

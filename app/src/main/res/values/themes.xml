@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UberMax Dark Premium Theme -->
+    <style name="Theme.UberMax" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">#FF00D4AA</item>
+        <item name="colorPrimaryVariant">#FF00A88A</item>
+        <item name="colorOnPrimary">#FF000000</item>
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">#FF7C4DFF</item>
+        <item name="colorSecondaryVariant">#FF6200EE</item>
+        <item name="colorOnSecondary">#FFFFFFFF</item>
+        <!-- Background and surface -->
+        <item name="android:colorBackground">#FF0D1117</item>
+        <item name="colorSurface">#FF161B22</item>
+        <item name="colorOnSurface">#FFE6EDF3</item>
+        <!-- Error -->
+        <item name="colorError">#FFFF5252</item>
+        <item name="colorOnError">#FF000000</item>
+        <!-- Status bar -->
+        <item name="android:statusBarColor">#FF0D1117</item>
+        <item name="android:navigationBarColor">#FF0D1117</item>
+    </style>
+</resources>
