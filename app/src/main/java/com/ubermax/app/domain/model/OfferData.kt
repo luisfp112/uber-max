@@ -26,7 +26,12 @@ data class OfferData(
     val rideType: String = "",        // Tipo de viaje (UberX, Comfort, etc.)
     val destination: String = "",     // Dirección de destino del pasajero
     val pickupAddress: String = "",   // Dirección de recogida
-    val rawTexts: List<String> = emptyList() // Textos brutos para debug/calibración
+    val rawTexts: List<String> = emptyList(), // Textos brutos para debug/calibración
+
+    // Coordenadas opcionales — cuando la UI de Uber las exponga, habilitan el
+    // point-in-polygon en RuleEngine para cancelar con precisión geográfica.
+    val destinationLatLng: Pair<Double, Double>? = null,
+    val pickupLatLng: Pair<Double, Double>? = null
 ) {
     val totalKm: Double get() = pickupKm + tripKm
     val estimatedHours: Double get() = estimatedMinutes / 60.0

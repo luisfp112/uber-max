@@ -1,6 +1,8 @@
 package com.ubermax.app.domain.rules
 
+import com.ubermax.app.data.db.entity.BlacklistZoneEntity
 import com.ubermax.app.data.db.entity.FilterRulesEntity
+import com.ubermax.app.domain.geometry.PolygonGeometry
 import com.ubermax.app.domain.model.Action
 import com.ubermax.app.domain.model.EvaluatedOffer
 import com.ubermax.app.domain.model.OfferDecision
@@ -27,14 +29,14 @@ class RuleEngine {
      * @param evaluated Oferta con métricas económicas calculadas
      * @param rules Reglas de filtrado configuradas por el conductor
      * @param blacklistKeywords Palabras clave de la lista negra por texto
-     * @param blacklistZones Zonas geográficas de la lista negra (nombre de zona)
+     * @param blacklistZones Polígonos de la lista negra (zona + keywords + vértices)
      * @return Decisión con acción y filtros fallidos
      */
     fun evaluate(
         evaluated: EvaluatedOffer,
         rules: FilterRulesEntity,
         blacklistKeywords: List<String> = emptyList(),
-        blacklistZones: List<String> = emptyList()
+        blacklistZones: List<BlacklistZoneEntity> = emptyList()
     ): OfferDecision {
 
         // ═══════════════════════════════════════════════
@@ -140,7 +142,12 @@ class RuleEngine {
 
     /**
      * Verifica si el destino o la dirección de recogida coinciden con la lista negra.
-     * Match por keyword (texto) y por nombre de zona geográfica.
+     *
+     * Estrategia de match (en orden de prioridad):
+     * 1. Keywords de texto (calles, barrios) — incluye keywords auto-extraídas de polígonos
+     * 2. Nombre de zona del mapa
+     * 3. Keywords extraídas del polígono (almacenadas en la zona)
+     * 4. Point-in-polygon (ray casting) cuando la oferta tiene coordenadas GPS
      *
      * Tanto el texto real de la oferta como las keywords y zonas se normalizan con
      * [TextNormalizer], de modo que las coincidencias ignoran mayúsculas, tildes y
@@ -151,15 +158,38 @@ class RuleEngine {
     private fun checkBlacklist(
         evaluated: EvaluatedOffer,
         keywords: List<String>,
-        zoneNames: List<String>
+        zones: List<BlacklistZoneEntity>
     ): String? {
         val destination = TextNormalizer.normalize(evaluated.offer.destination)
         val pickup = TextNormalizer.normalize(evaluated.offer.pickupAddress)
         val combined = "$destination $pickup".trim()
 
+        // 4. Point-in-polygon: si la oferta trae coordenadas, es la verificación
+        // más precisa (no depende del texto). Se ejecuta ANTES que el texto porque
+        // no requiere que la dirección exacta coincida con una keyword.
+        val coords = listOfNotNull(
+            evaluated.offer.destinationLatLng,
+            evaluated.offer.pickupLatLng
+        )
+
+        if (coords.isNotEmpty()) {
+            for (zone in zones) {
+                val polygon = zone.polygon
+                if (polygon.size < 3) continue
+
+                val inPolygon = coords.any { (lat, lng) ->
+                    PolygonGeometry.isPointInPolygon(lat, lng, polygon)
+                }
+
+                if (inPolygon) {
+                    return "zona '${zone.name}' (punto en polígono)"
+                }
+            }
+        }
+
         if (combined.isEmpty()) return null
 
-        // Match por keywords de texto (calles, barrios, sectores)
+        // 1. Match por keywords de texto (calles, barrios, sectores, manuales y auto-extraídas)
         for (keyword in keywords) {
             val kw = TextNormalizer.normalize(keyword)
             if (kw.isNotEmpty() && combined.contains(kw)) {
@@ -167,11 +197,21 @@ class RuleEngine {
             }
         }
 
-        // Match por nombres de zonas del mapa
-        for (zoneName in zoneNames) {
-            val zn = TextNormalizer.normalize(zoneName)
+        // 2. Match por nombres de zonas del mapa
+        for (zone in zones) {
+            val zn = TextNormalizer.normalize(zone.name)
             if (zn.isNotEmpty() && combined.contains(zn)) {
-                return "zona '$zoneName'"
+                return "zona '${zone.name}'"
+            }
+        }
+
+        // 3. Match por keywords extraídas automáticamente del polígono
+        for (zone in zones) {
+            for (kw in zone.extractedKeywords) {
+                val nkw = TextNormalizer.normalize(kw)
+                if (nkw.isNotEmpty() && combined.contains(nkw)) {
+                    return "zona '${zone.name}' (keyword '$kw')"
+                }
             }
         }
 

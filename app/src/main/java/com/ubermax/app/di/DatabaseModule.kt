@@ -23,7 +23,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "ubermax_db"
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
             .enableMultiInstanceInvalidation()
             .build()
     }

@@ -1,6 +1,7 @@
 package com.ubermax.app.domain.rules
 
 import com.ubermax.app.data.db.entity.BlacklistEntryEntity
+import com.ubermax.app.data.db.entity.BlacklistZoneEntity
 import com.ubermax.app.data.db.entity.FilterRulesEntity
 import com.ubermax.app.data.db.entity.VehicleConfigEntity
 import com.ubermax.app.domain.model.Action
@@ -26,7 +27,7 @@ class RuleEngineTest {
 
     private val evaluator = EvaluateOfferUseCase()
     private val ruleEngine = RuleEngine()
-    private val vehicle = VehicleConfigEntity() // costPerKm = $0.08 USD
+    private val vehicle = VehicleConfigEntity(manualCostPerKm = 0.08) // costPerKm manual = $0.08 USD
 
     /** Construye una oferta rentable a 10 USD con viaje corto (sin deadhead). */
     private fun evaluatedOffer(
@@ -249,11 +250,99 @@ class RuleEngineTest {
 
     @Test
     fun `el match por zona del mapa tambien es robusto a tildes`() {
+        // Polígono de la zona "Escalón" (San Salvador)
+        val escalonZone = BlacklistZoneEntity(
+            name = "Escalón",
+            polygonJson = """[[13.6900,-89.1900],[13.7000,-89.1900],[13.7000,-89.1800],[13.6900,-89.1800]]"""
+        )
+
         val decision = ruleEngine.evaluate(
             evaluatedOffer(destination = "Col. Escalón, SAN SALVADOR"),
             FilterRulesEntity(),
             blacklistKeywords = emptyList(),
-            blacklistZones = listOf("Escalón")
+            blacklistZones = listOf(escalonZone)
+        )
+
+        assertEquals(Action.CANCEL, decision.action)
+    }
+
+    @Test
+    fun `punto en poligono cancela la oferta aunque el texto no coincida`() {
+        // Polígono alrededor de "Ficoa" (Ambato): noroeste/sureste
+        val ficoaZone = BlacklistZoneEntity(
+            name = "Ficoa",
+            polygonJson = """[[-1.2300,-78.6200],[-1.2300,-78.6100],[-1.2400,-78.6100],[-1.2400,-78.6200]]"""
+        )
+
+        // Destino con TEXTO no coincidente pero COORDENADA dentro del polígono
+        val decision = ruleEngine.evaluate(
+            evaluator.evaluate(
+                OfferData(
+                    rawFare = 8.0,
+                    pickupKm = 1.0,
+                    tripKm = 5.0,
+                    pickupMinutes = 3,
+                    tripMinutes = 15,
+                    estimatedMinutes = 18,
+                    passengerRating = 4.8,
+                    destination = "Dirección genérica sin coincidencia",
+                    pickupAddress = "Otro lugar normal",
+                    destinationLatLng = (-1.2350 to -78.6150) // centro de Ficoa
+                ),
+                vehicle
+            ),
+            FilterRulesEntity(),
+            blacklistKeywords = emptyList(),
+            blacklistZones = listOf(ficoaZone)
+        )
+
+        assertEquals(Action.CANCEL, decision.action)
+    }
+
+    @Test
+    fun `punto fuera del poligono no cancela`() {
+        val ficoaZone = BlacklistZoneEntity(
+            name = "Ficoa",
+            polygonJson = """[[-1.2300,-78.6200],[-1.2300,-78.6100],[-1.2400,-78.6100],[-1.2400,-78.6200]]"""
+        )
+
+        val decision = ruleEngine.evaluate(
+            evaluator.evaluate(
+                OfferData(
+                    rawFare = 8.0,
+                    pickupKm = 1.0,
+                    tripKm = 5.0,
+                    pickupMinutes = 3,
+                    tripMinutes = 15,
+                    estimatedMinutes = 18,
+                    passengerRating = 4.8,
+                    destination = "Dirección genérica",
+                    pickupAddress = "Otro lugar normal",
+                    destinationLatLng = (-1.2500 to -78.6300) // fuera del polígono
+                ),
+                vehicle
+            ),
+            FilterRulesEntity(),
+            blacklistKeywords = emptyList(),
+            blacklistZones = listOf(ficoaZone)
+        )
+
+        assertEquals(Action.ACCEPT, decision.action)
+    }
+
+    @Test
+    fun `keyword extraida del poligono cancela la oferta por texto`() {
+        val zone = BlacklistZoneEntity(
+            name = "Huachi",
+            polygonJson = """[[-1.2500,-78.6300],[-1.2400,-78.6300],[-1.2400,-78.6200],[-1.2500,-78.6200]]""",
+            extractedKeywordsJson = """["Av. Huachi","Barrio Huachi Grande"]"""
+        )
+
+        val decision = ruleEngine.evaluate(
+            evaluatedOffer(destination = "Av. HUACHI, Sector Norte"),
+            FilterRulesEntity(),
+            blacklistKeywords = emptyList(),
+            blacklistZones = listOf(zone)
         )
 
         assertEquals(Action.CANCEL, decision.action)

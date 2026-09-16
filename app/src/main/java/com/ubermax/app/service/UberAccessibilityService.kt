@@ -6,6 +6,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.ubermax.app.accessibility.ActionExecutor
 import com.ubermax.app.accessibility.OfferParser
+import com.ubermax.app.data.db.entity.BlacklistZoneEntity
 import com.ubermax.app.data.db.entity.FilterRulesEntity
 import com.ubermax.app.data.db.entity.TripLogEntity
 import com.ubermax.app.data.db.entity.VehicleConfigEntity
@@ -60,7 +61,7 @@ class UberAccessibilityService : AccessibilityService() {
     private var vehicleConfig: VehicleConfigEntity = VehicleConfigEntity()
     private var filterRules: FilterRulesEntity = FilterRulesEntity()
     private var blacklistKeywords: List<String> = emptyList()
-    private var blacklistZoneNames: List<String> = emptyList()
+    private var blacklistZones: List<BlacklistZoneEntity> = emptyList()
 
     companion object {
         private const val TAG = "UberA11Y"
@@ -159,14 +160,18 @@ class UberAccessibilityService : AccessibilityService() {
             loadConfig()
 
             // 3. Evaluar económicamente
-            val evaluated = evaluator.evaluate(offer, vehicleConfig)
+            val evaluated = evaluator.evaluate(
+                offer = offer,
+                config = vehicleConfig,
+                deadheadThresholdKm = filterRules.deadheadThresholdKm
+            )
 
             // 4. Aplicar reglas del conductor
             var decision = ruleEngine.evaluate(
                 evaluated = evaluated,
                 rules = filterRules,
                 blacklistKeywords = blacklistKeywords,
-                blacklistZones = blacklistZoneNames
+                blacklistZones = blacklistZones
             )
 
             // 4.5 IA — Recomendación
@@ -267,18 +272,28 @@ class UberAccessibilityService : AccessibilityService() {
         return null
     }
 
-    private fun loadConfig() {
-        serviceScope.launch(Dispatchers.IO) {
-            try {
-                vehicleConfig = configRepository.getVehicleConfig()
-                filterRules = configRepository.getFilterRules()
-                blacklistKeywords = configRepository.getAllBlacklistKeywords()
-                blacklistZoneNames = configRepository.getAllBlacklistZoneNames()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error cargando config: ${e.message}")
-            }
+private fun loadConfig() {
+    serviceScope.launch(Dispatchers.IO) {
+        try {
+            // Se lee TODO primero y solo se publica si carga completa...
+            val vc = configRepository.getVehicleConfig()
+            val fr = configRepository.getFilterRules()
+            val keywords = configRepository.getAllMergedBlacklistKeywords()
+            val zones = configRepository.getAllBlacklistZones()
+
+            // ...para que un fallo a mitad de camino no mezcle config nueva con vieja.
+            vehicleConfig = vc
+            filterRules = fr
+            blacklistKeywords = keywords
+            blacklistZones = zones
+        } catch (e: Exception) {
+            // Cache fallback: las variables de clase conservan la ÚLTIMA configuración
+            // válida (o los valores por defecto si nunca se cargó), así el pipeline
+            // sigue decidiendo con los últimos valores conocidos del conductor.
+            Log.w(TAG, "Error recargando config; se mantiene la última válida: ${e.message}")
         }
     }
+}
 
     private suspend fun logTrip(offer: OfferData, evaluated: EvaluatedOffer, decision: OfferDecision) {
         withContext(Dispatchers.IO) {

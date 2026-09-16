@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.graphics.Rect
 import com.ubermax.app.util.Logs
+import com.ubermax.app.util.TextNormalizer
 import android.view.accessibility.AccessibilityNodeInfo
 import com.ubermax.app.util.RegexPatterns
 import kotlinx.coroutines.delay
@@ -22,14 +23,15 @@ import kotlin.coroutines.resume
  *
  * ACCIONES:
  * 1. ACCEPT → toque en el botón de aceptar:
- *    - Ofertas asignadas:    "Aceptar" / "Aceptar viaje" / "Confirmar"
- *    - Ofertas abiertas:     "Viaje disponible" / "Postularse" / "Aplicar"
+ *    - Ofertas asignadas:    "Aceptar"
+ *    - Ofertas abiertas:     "Viaje disponible"
+ *    (Detección ESTRICTA: solo estas dos frases, normalizadas con TextNormalizer.)
  * 2. CANCEL → toque en la X (cuadrante superior derecho de la tarjeta)
  *
  * Estrategias de toque (cascada):
- * 1. ACTION_CLICK directo en el nodo
- * 2. Subir al contenedor clickable más cercano → ACTION_CLICK
- * 3. dispatchGesture (gesto de toque REAL) en el centro exacto del contenedor/botón
+ * 1. ACTION_CLICK directo en el nodo que contiene la frase normalizada
+ * 2. Subir al primer padre clickable (findClickableParent) → ACTION_CLICK
+ * 3. dispatchGesture (gesto de toque REAL) en el centro del padre/botón
  * 4. Fallback: dispatchGesture en proporciones relativas de pantalla
  *
  * Tras un toque exitoso se RE-VERIFICA la pantalla: si el botón sigue presente,
@@ -42,15 +44,19 @@ class ActionExecutor(
     companion object {
         private const val TAG = "ActionExecutor"
 
-        // ── Textos del botón ACEPTAR (asignadas + abiertas) ──
-        private val ACCEPT_TEXTS = listOf(
+        // ── Frases de aceptación ──
+        // Cubre ofertas asignadas (aceptar, confirmar) y ofertas abiertas
+        // (viaje disponible, postularse, solicitar...). Todas se comparan
+        // con TextNormalizer para ignorar mayúsculas, tildes y símbolos.
+        private val ACCEPT_PHRASES = listOf(
             // Ofertas asignadas a este conductor
-            "aceptar", "aceptar viaje", "confirmar",
+            "aceptar", "aceptar viaje", "confirmar", "accept",
             // Ofertas abiertas (se compiten por ellas)
-            "viaje disponible", "postularse", "postularte", "postularme", "postular",
-            "aplicar", "apuntarse",
+            "viaje disponible", "disponible", "postularse", "postularte",
+            "postularme", "postular", "aplicar", "apuntarse", "apuntarme",
+            "solicitar", "solicitar viaje", "solicita", "solicito", "participar",
             // Inglés
-            "trip available", "accept", "confirm", "apply"
+            "trip available", "request", "request trip", "join", "apply"
         )
 
         // ── Textos del botón CANCELAR / RECHAZAR (X superior) ──
@@ -59,17 +65,24 @@ class ActionExecutor(
             "close", "dismiss", "decline", "cancel", "discard"
         )
 
-        /** True si [raw] corresponde a un botón de aceptar (asignada o abierta). */
+        /**
+         * True si el texto normalizado ([TextNormalizer]) contiene una de las
+         * frases de aceptación.
+         *
+         * La normalización ignora mayúsculas, tildes y caracteres especiales, de
+         * modo que "ACEPTAR", "Aceptar", "¡Aceptar!", "VÍAJE DISPONIBLE", etc.,
+         * todas se detectan correctamente.
+         */
         fun matchesAcceptText(raw: String): Boolean {
-            val t = raw.trim().lowercase()
-            return ACCEPT_TEXTS.any { t.contains(it) }
+            val t = TextNormalizer.normalize(raw)
+            return ACCEPT_PHRASES.any { t.contains(TextNormalizer.normalize(it)) }
         }
 
         /** True si [raw] corresponde al botón X / descartar. "x" aislado también vale. */
         fun matchesDismissText(raw: String): Boolean {
-            val t = raw.trim().lowercase()
+            val t = TextNormalizer.normalize(raw)
             if (t == "x") return true
-            return DISMISS_TEXTS.any { t.contains(it) }
+            return DISMISS_TEXTS.any { t.contains(TextNormalizer.normalize(it)) }
         }
 
         // ── Proporciones relativas (Se aplican a la resolución real del dispositivo) ──
@@ -203,8 +216,14 @@ class ActionExecutor(
         val candidates = mutableListOf<Candidate>()
 
         fun walk(node: AccessibilityNodeInfo, depth: Int) {
-            val text = node.text?.toString() ?: ""
-            val desc = node.contentDescription?.toString() ?: ""
+            val text: String
+            val desc: String
+            try {
+                text = node.text?.toString() ?: ""
+                desc = node.contentDescription?.toString() ?: ""
+            } catch (e: IllegalStateException) {
+                return // Nodo defunct tras cambiar la ventana — dejar de recorrer
+            }
             val matchesText = matcher(text)
             val matchesDesc = matcher(desc)
             if (matchesText || matchesDesc) {
@@ -218,7 +237,7 @@ class ActionExecutor(
                 )
             }
             for (i in 0 until node.childCount) {
-                val child = node.getChild(i)
+                val child = try { node.getChild(i) } catch (e: IllegalStateException) { null }
                 if (child != null) {
                     walk(child, depth + 1)
                     child.recycle()
@@ -226,7 +245,11 @@ class ActionExecutor(
             }
         }
 
-        walk(root, 0)
+        try {
+            walk(root, 0)
+        } catch (e: IllegalStateException) {
+            // La ventana cambió mientras recorríamos: usar lo recolectado hasta ahora
+        }
         if (candidates.isEmpty()) return null
 
         val best = candidates.maxWithOrNull(
@@ -268,14 +291,19 @@ class ActionExecutor(
     }
 
     /**
-     * Devuelve los bounds de la tarjeta de la oferta: contenedor clicable más
-     * cercano al nodo que contiene la tarifa (patrón monetario).
+     * Devuelve los bounds de la tarjeta de la oferta: el contenedor clicable de
+     * MAYOR ÁREA ancestro del nodo que contiene la tarifa (patrón monetario).
+     *
+     * Preferir el ancestro más grande (no el más cercano) evita elegir como
+     * tarjeta un contenedor pequeño (botón, ícono) y permite ubicar la X en el
+     * cuadrante superior derecho de la tarjeta completa.
      */
     private fun findCardContainer(rootNode: AccessibilityNodeInfo): TapGeometry.RectSpec? {
         val fareNode = findActionNode(rootNode) { RegexPatterns.FARE_PATTERN.containsMatchIn(it) }
             ?: return null
         try {
-            val container = nearestClickableAncestor(fareNode)
+            val container = largestClickableAncestor(fareNode)
+                ?: return null
             try {
                 val bounds = Rect()
                 container.getBoundsInScreen(bounds)
@@ -292,6 +320,44 @@ class ActionExecutor(
     }
 
     /**
+     * Recorre todos los ancestros clicables de [node] (hasta MAX_PARENT_DEPTH) y
+     * devuelve el de mayor área (la "tarjeta" completa, no un botón interno).
+     * Retorna null si no hay ninguno clicable; el llamador usará la pantalla.
+     */
+    private fun largestClickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isClickable) return AccessibilityNodeInfo.obtain(node)
+
+        var best: AccessibilityNodeInfo? = null
+        var bestArea = -1L
+
+        var current = try { node.parent } catch (e: IllegalStateException) { null }
+        var depth = 0
+        while (current != null && depth < MAX_PARENT_DEPTH) {
+            val next = try { current.parent } catch (e: IllegalStateException) { null }
+            try {
+                if (current.isClickable) {
+                    val bounds = Rect()
+                    current.getBoundsInScreen(bounds)
+                    if (!bounds.isEmpty) {
+                        val area = bounds.width().toLong() * bounds.height()
+                        if (area > bestArea) {
+                            best?.recycle()
+                            best = AccessibilityNodeInfo.obtain(current)
+                            bestArea = area
+                        }
+                    }
+                }
+            } catch (e: IllegalStateException) {
+                // Nodo obsoleto tras un cambio de ventana — se ignora
+            }
+            current.recycle()
+            current = next
+            depth++
+        }
+        return best
+    }
+
+    /**
      * Busca un ícono de cierre (ImageButton/ImageView clicable) cuyo centro esté
      * en el cuadrante superior derecho del contenedor (tarjeta o pantalla).
      */
@@ -303,7 +369,7 @@ class ActionExecutor(
         var bestRight = -1
 
         fun walk(node: AccessibilityNodeInfo) {
-            val className = node.className?.toString() ?: ""
+            val className = try { node.className?.toString() ?: "" } catch (e: IllegalStateException) { "" }
             val isIcon = node.isClickable &&
                 (className.contains("ImageButton") || className.contains("ImageView"))
             if (isIcon) {
@@ -320,7 +386,7 @@ class ActionExecutor(
                 }
             }
             for (i in 0 until node.childCount) {
-                val child = node.getChild(i)
+                val child = try { node.getChild(i) } catch (e: IllegalStateException) { null }
                 if (child != null) {
                     walk(child)
                     child.recycle()
@@ -328,7 +394,11 @@ class ActionExecutor(
             }
         }
 
-        walk(rootNode)
+        try {
+            walk(rootNode)
+        } catch (e: IllegalStateException) {
+            // Ventana cambió durante el recorrido — usar lo hallado hasta ahora
+        }
         return best
     }
 
@@ -345,13 +415,23 @@ class ActionExecutor(
      *  4. Como último recurso, tap en el centro del propio nodo.
      */
     private suspend fun tryRealTap(node: AccessibilityNodeInfo, actionName: String): Boolean {
-        val container = nearestClickableAncestor(node)
+        val container = try {
+            largestClickableAncestor(node)
+        } catch (e: IllegalStateException) {
+            null
+        } ?: return false
+
         try {
             val bounds = Rect()
             container.getBoundsInScreen(bounds)
 
             // 1. ACTION_CLICK sobre el contenedor clicable
-            if (container.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            val clicked = try {
+                container.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            } catch (e: IllegalStateException) {
+                false
+            }
+            if (clicked) {
                 Logs.i(TAG, "✅ $actionName vía ACTION_CLICK en contenedor ($bounds)")
                 return true
             }
@@ -359,21 +439,23 @@ class ActionExecutor(
             // 2. Gesto de toque REAL en el centro exacto del contenedor/botón
             if (!bounds.isEmpty) {
                 val spec = TapGeometry.RectSpec(bounds.left, bounds.top, bounds.right, bounds.bottom)
-                val (x, y) = TapGeometry.centerOf(spec)
+                val (x, y) = TapGeometry.relativePointIn(spec, 0.5f, 0.5f)
                 val (cx, cy) = clampToScreen(x, y)
-                Logs.d(TAG, "👆 $actionName dispatchGesture en (${cx},${cy})")
+                Logs.d(TAG, "👆 $actionName dispatchGesture centrado en (${cx},${cy})")
                 if (tryGestureWithCallback(cx.toFloat(), cy.toFloat())) {
                     return true
                 }
             }
 
-            // 3. Último recurso: gesto en el centro del nodo original
+            // 3. Último recurso: gesto en el centro del propio nodo
             val own = Rect()
             node.getBoundsInScreen(own)
             if (!own.isEmpty) {
                 val (x, y) = clampToScreen(own.centerX(), own.centerY())
                 return tryGestureWithCallback(x.toFloat(), y.toFloat())
             }
+        } catch (e: IllegalStateException) {
+            Logs.d(TAG, "⚠️ $actionName: nodo obsoleto durante el toque")
         } finally {
             container.recycle()
         }
@@ -391,7 +473,14 @@ class ActionExecutor(
     ): Boolean {
         if (rootNode == null) return true
         delay(VERIFY_DELAY_MS)
-        val stillPresent = findActionNode(rootNode, matcher)
+        val stillPresent = try {
+            findActionNode(rootNode, matcher)
+        } catch (e: IllegalStateException) {
+            // La ventana desapareció al ejecutar la acción → la tarjeta ya no está.
+            // Eso es exactamente lo que queremos: la acción SÍ tuvo efecto.
+            Logs.d(TAG, "✅ Ventana cerrada tras la acción — verificación aprobada")
+            null
+        }
         return if (stillPresent != null) {
             stillPresent.recycle()
             false
@@ -419,25 +508,29 @@ class ActionExecutor(
     //  Helpers de Android
     // ═══════════════════════════════════════════════════════
 
-    /** Retorna una copia `obtain()` del nodo clicable más cercano (hasta MAX_PARENT_DEPTH niveles). */
-    private fun nearestClickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo {
+    /** Retorna una copia `obtain()` del PRIMER padre clicable de [node], u null si ninguno lo es (hasta MAX_PARENT_DEPTH). */
+    private fun findClickableParent(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
         if (node.isClickable) return AccessibilityNodeInfo.obtain(node)
 
-        var parent = node.parent
+        var parent = try { node.parent } catch (e: IllegalStateException) { null }
         var depth = 0
         while (parent != null && depth < MAX_PARENT_DEPTH) {
-            if (parent.isClickable) {
-                val result = AccessibilityNodeInfo.obtain(parent)
-                parent.recycle()
-                return result
+            val next = try { parent.parent } catch (e: IllegalStateException) { null }
+            try {
+                if (parent.isClickable) {
+                    val result = AccessibilityNodeInfo.obtain(parent)
+                    parent.recycle()
+                    return result
+                }
+            } catch (e: IllegalStateException) {
+                // Nodo obsoleto tras un cambio de ventana — se ignora
             }
-            val grandparent = parent.parent
             parent.recycle()
-            parent = grandparent
+            parent = next
             depth++
         }
         parent?.recycle()
-        return AccessibilityNodeInfo.obtain(node)
+        return null
     }
 
     /**

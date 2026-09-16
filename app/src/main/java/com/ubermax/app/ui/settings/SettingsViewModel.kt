@@ -14,36 +14,43 @@ import javax.inject.Inject
 
 data class SettingsState(
     // Vehicle
-    val vehicleName: String = "Spark 2008 1.0L",
-    val costPerKm: Double = 0.08,
+    val vehicleName: String = "",
+    val consumptionKmPerUnit: Double = 12.0,
+    val fuelUnitId: Int = 0,
+    val fuelPricePerUnit: Double = 0.86,
+    val maintenancePerKm: Double = 0.03,
+    val manualCostPerKm: Double = 0.0,
     val avgSpeed: Double = 22.0,
-    
+
     // Filtros de Tarifa Bruta
     val minFare: Double = 1.50,
-    
+
     // Filtros de Ganancia Neta
     val minNetProfit: Double = 0.80,
     val minProfitPerKm: Double = 0.15,
     val minProfitPerHour: Double = 3.00,
-    
+
     // Filtros de Distancia
     val maxPickupKm: Double = 5.0,
     val maxTripKm: Double = 30.0,
-    
+
     // Filtros de Tiempo
     val maxTotalMinutes: Int = 60,
-    
+
     // Filtros de Pasajero
     val minPassengerRating: Double = 4.5,
-    
+
     // Filtros de Ratio
     val maxPickupTripRatio: Double = 1.0,
-    
+
     // Toggles
     val blacklistEnabled: Boolean = true,
     val autoAcceptEnabled: Boolean = true,
     val aiEnabled: Boolean = true,
-    
+
+    // Deadhead
+    val deadheadThresholdKm: Double = 8.0,
+
     // Blacklist
     val blacklistEntries: List<BlacklistEntryEntity> = emptyList()
 )
@@ -65,7 +72,11 @@ class SettingsViewModel @Inject constructor(
             val bl = configRepository.getAllBlacklist()
             _state.value = SettingsState(
                 vehicleName = vc.vehicleName,
-                costPerKm = vc.costPerKm,
+                consumptionKmPerUnit = vc.consumptionKmPerUnit,
+                fuelUnitId = vc.fuelUnitId,
+                fuelPricePerUnit = vc.fuelPricePerUnit,
+                maintenancePerKm = vc.maintenancePerKm,
+                manualCostPerKm = vc.manualCostPerKm,
                 avgSpeed = vc.avgSpeedKmh,
                 minFare = fr.minFare,
                 minNetProfit = fr.minNetProfit,
@@ -79,21 +90,43 @@ class SettingsViewModel @Inject constructor(
                 blacklistEnabled = fr.blacklistEnabled,
                 autoAcceptEnabled = fr.autoAcceptEnabled,
                 aiEnabled = fr.aiEnabled,
+                deadheadThresholdKm = fr.deadheadThresholdKm,
                 blacklistEntries = bl
             )
         }
     }
 
     fun saveAll(
-        vehicleName: String, costPerKm: Double, avgSpeed: Double,
-        minFare: Double, minNetProfit: Double, minProfitPerKm: Double, minProfitPerHour: Double,
-        maxPickupKm: Double, maxTripKm: Double, maxTotalMinutes: Int, 
-        minPassengerRating: Double, maxPickupTripRatio: Double,
-        blacklistEnabled: Boolean, autoAcceptEnabled: Boolean, aiEnabled: Boolean
+        vehicleName: String,
+        consumptionKmPerUnit: Double,
+        fuelUnitId: Int,
+        fuelPricePerUnit: Double,
+        maintenancePerKm: Double,
+        manualCostPerKm: Double,
+        avgSpeed: Double,
+        minFare: Double,
+        minNetProfit: Double,
+        minProfitPerKm: Double,
+        minProfitPerHour: Double,
+        maxPickupKm: Double,
+        maxTripKm: Double,
+        maxTotalMinutes: Int,
+        minPassengerRating: Double,
+        maxPickupTripRatio: Double,
+        blacklistEnabled: Boolean,
+        autoAcceptEnabled: Boolean,
+        aiEnabled: Boolean,
+        deadheadThresholdKm: Double = 8.0
     ) {
         viewModelScope.launch {
             configRepository.updateVehicleConfig(VehicleConfigEntity(
-                vehicleName = vehicleName, costPerKm = costPerKm, avgSpeedKmh = avgSpeed
+                vehicleName = vehicleName,
+                consumptionKmPerUnit = consumptionKmPerUnit,
+                fuelUnitId = fuelUnitId,
+                fuelPricePerUnit = fuelPricePerUnit,
+                maintenancePerKm = maintenancePerKm,
+                manualCostPerKm = manualCostPerKm,
+                avgSpeedKmh = avgSpeed
             ))
             configRepository.updateFilterRules(FilterRulesEntity(
                 minFare = minFare,
@@ -107,7 +140,8 @@ class SettingsViewModel @Inject constructor(
                 maxPickupTripRatio = maxPickupTripRatio,
                 blacklistEnabled = blacklistEnabled,
                 autoAcceptEnabled = autoAcceptEnabled,
-                aiEnabled = aiEnabled
+                aiEnabled = aiEnabled,
+                deadheadThresholdKm = deadheadThresholdKm
             ))
         }
     }

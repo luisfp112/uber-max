@@ -6,6 +6,7 @@ import com.ubermax.app.data.db.dao.ZoneStat
 import com.ubermax.app.data.db.entity.TripLogEntity
 import com.ubermax.app.domain.model.EvaluatedOffer
 import com.ubermax.app.domain.model.OfferDecision
+import com.ubermax.app.domain.port.TripHistorySource
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 import java.util.Locale
@@ -19,7 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class TripRepository @Inject constructor(
     private val tripLogDao: TripLogDao
-) {
+) : TripHistorySource {
     /** Guardar una decisión de oferta en la base de datos */
     suspend fun logDecision(decision: OfferDecision) {
         val calendar = Calendar.getInstance()
@@ -46,7 +47,7 @@ class TripRepository @Inject constructor(
     }
 
     /** Stream reactivo de todos los viajes */
-    fun getAllTripsFlow(): Flow<List<TripLogEntity>> = tripLogDao.getAllTripsFlow()
+    override fun getAllTripsFlow(): Flow<List<TripLogEntity>> = tripLogDao.getAllTripsFlow()
 
     /** Viajes recientes */
     suspend fun getRecentTrips(limit: Int = 50) = tripLogDao.getRecentTrips(limit)

@@ -27,7 +27,7 @@ class OfferParserTest {
     private val parser = OfferParser()
     private val evaluator = EvaluateOfferUseCase()
     private val ruleEngine = RuleEngine()
-    private val vehicle = VehicleConfigEntity() // costPerKm = $0.08 USD
+    private val vehicle = VehicleConfigEntity(manualCostPerKm = 0.08) // costPerKm manual = $0.08 USD
 
     // ═══════════════════════════════════════════════════════
     //  Datos simulados de Uber Driver
@@ -344,11 +344,15 @@ class OfferParserTest {
         val offer = parser.parseFromTextNodes(
             nodesOf(*openOfferPostularseTexts().toTypedArray())
         )!!
+        val escalonZone = com.ubermax.app.data.db.entity.BlacklistZoneEntity(
+            name = "escalón",
+            polygonJson = """[[13.6900,-89.1900],[13.7000,-89.1900],[13.7000,-89.1800],[13.6900,-89.1800]]"""
+        )
         val decision = ruleEngine.evaluate(
             evaluator.evaluate(offer, vehicle),
             FilterRulesEntity(),
             blacklistKeywords = emptyList(),
-            blacklistZones = listOf("escalón")
+            blacklistZones = listOf(escalonZone)
         )
 
         assertEquals(Action.CANCEL, decision.action)

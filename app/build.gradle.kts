@@ -79,11 +79,14 @@ dependencies {
     // DataStore Preferences
     implementation(libs.androidx.datastore.preferences)
 
-    // OSMDroid — Mapa interactivo para lista negra de zonas
+    // OSMDroid (mapa gratuito OpenStreetMap, sin API key) + Localización
     implementation(libs.osmdroid.android)
+    implementation(libs.play.services.location)
+    implementation(libs.okhttp)
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)

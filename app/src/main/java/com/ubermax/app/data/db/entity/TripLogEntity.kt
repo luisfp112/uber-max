@@ -2,13 +2,26 @@ package com.ubermax.app.data.db.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
  * Registro de cada oferta de viaje recibida de Uber Driver.
  * Almacena datos brutos extraídos, cálculos económicos y la decisión tomada.
+ *
+ * Los índices aceleran las consultas de historial (filtros por día, destino,
+ * hora y decisión) y de exportación. Nombres generados como lo espera Room:
+ * `index_<tabla>_<columna>`.
  */
-@Entity(tableName = "trip_log")
+@Entity(
+    tableName = "trip_log",
+    indices = [
+        Index(value = ["timestamp"]),
+        Index(value = ["destination"]),
+        Index(value = ["hour_of_day"]),
+        Index(value = ["decision"])
+    ]
+)
 data class TripLogEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

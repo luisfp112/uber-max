@@ -3,22 +3,24 @@ package com.ubermax.app.ui.settings
 import android.content.Intent
 import android.os.Bundle
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import com.ubermax.app.R
 import com.ubermax.app.databinding.ActivitySettingsBinding
 import com.ubermax.app.ui.blacklist.BlacklistMapActivity
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
  * Cuestionario estilo Maxymo + Gestión de lista negra.
+ *
+ * Cada filtro relevante incluye un ícono de ayuda (ℹ) que explica qué es,
+ * en qué unidad debe configurarse y un ejemplo práctico.
  */
 @AndroidEntryPoint
 class SettingsActivity : AppCompatActivity() {
@@ -38,11 +40,20 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, BlacklistMapActivity::class.java))
         }
 
+        setupHelpIcons()
+
         lifecycleScope.launch {
             vm.settingsState.collectLatest { s ->
                 // Vehicle
                 b.etVehicleName.setText(s.vehicleName)
-                b.etCostPerKm.setText(s.costPerKm.toString())
+                b.etConsumption.setText(s.consumptionKmPerUnit.toString())
+                when (s.fuelUnitId) {
+                    1 -> b.rbGallon.isChecked = true
+                    else -> b.rbLiter.isChecked = true
+                }
+                b.etFuelPrice.setText(s.fuelPricePerUnit.toString())
+                b.etMaintenancePerKm.setText(s.maintenancePerKm.toString())
+                b.etManualCostPerKm.setText(s.manualCostPerKm.toString())
                 b.etAvgSpeed.setText(s.avgSpeed.toString())
                 // Fare filters
                 b.etMinFare.setText(s.minFare.toString())
@@ -61,6 +72,8 @@ class SettingsActivity : AppCompatActivity() {
                 b.switchBlacklist.isChecked = s.blacklistEnabled
                 b.switchAutoAccept.isChecked = s.autoAcceptEnabled
                 b.switchAi.isChecked = s.aiEnabled
+                // Deadhead
+                b.etDeadheadThresholdKm.setText(s.deadheadThresholdKm.toString())
 
                 // Blacklist entries
                 b.blacklistContainer.removeAllViews()
@@ -81,28 +94,92 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupHelpIcons() {
+                val helpData = listOf(
+            Triple(b.tilMaxPickupKm, R.string.help_max_pickup_title, R.string.help_max_pickup_body),
+            Triple(b.tilMaxTripKm, R.string.help_max_trip_title, R.string.help_max_trip_body),
+            Triple(b.tilMinPassengerRating, R.string.help_rating_title, R.string.help_rating_body),
+            Triple(b.tilMinNetProfit, R.string.help_net_profit_title, R.string.help_net_profit_body),
+            Triple(b.tilMinProfitPerKm, R.string.help_profit_km_title, R.string.help_profit_km_body)
+        )
+        for ((til, titleResId, bodyResId) in helpData) {
+            til.setEndIconOnClickListener {
+                AlertDialog.Builder(this)
+                    .setTitle(getString(titleResId))
+                    .setMessage(getString(bodyResId))
+                    .setPositiveButton("Entendido", null)
+                    .show()
+            }
+        }
+    }
+
     private fun save() {
+        // Validar TODOS los campos numéricos antes de guardar.
+        // Muestra un error específico por campo en lugar de un try/catch genérico.
+        val numericFields = listOf(
+            "Consumo" to b.etConsumption,
+            "Precio combustible" to b.etFuelPrice,
+            "Mantenimiento/km" to b.etMaintenancePerKm,
+            "Costo manual/km" to b.etManualCostPerKm,
+            "Velocidad promedio" to b.etAvgSpeed,
+            "Tarifa mínima" to b.etMinFare,
+            "Ganancia neta mínima" to b.etMinNetProfit,
+            "Ganancia/km mínima" to b.etMinProfitPerKm,
+            "Ganancia/hora mínima" to b.etMinProfitPerHour,
+            "Pickup máx" to b.etMaxPickupKm,
+            "Viaje máx" to b.etMaxTripKm,
+            "Tiempo máx (min)" to b.etMaxTotalMinutes,
+            "Umbral vuelta vacía (km)" to b.etDeadheadThresholdKm,
+            "Rating mín" to b.etMinPassengerRating
+        )
+
+        // Recolectar errores de validación
+        val errors = mutableListOf<String>()
+        for ((label, editText) in numericFields) {
+            val text = editText.text.toString().trim()
+            if (text.isEmpty()) {
+                errors += "$label: vacío"
+            } else {
+                try {
+                    editText.parseNumeric()
+                } catch (e: NumberFormatException) {
+                    errors += "$label: '${text}' no es numérico"
+                }
+            }
+        }
+
+        if (errors.isNotEmpty()) {
+            val msg = errors.take(4).joinToString("\n") + if (errors.size > 4) "\n... y ${errors.size - 4} más" else ""
+            Toast.makeText(this, "Error en:\n$msg", Toast.LENGTH_LONG).show()
+            return
+        }
+
         try {
-            vm.saveAll(
+vm.saveAll(
                 vehicleName = b.etVehicleName.text.toString(),
-                costPerKm = b.etCostPerKm.text.toString().toDouble(),
-                avgSpeed = b.etAvgSpeed.text.toString().toDouble(),
-                minFare = b.etMinFare.text.toString().toDouble(),
-                minNetProfit = b.etMinNetProfit.text.toString().toDouble(),
-                minProfitPerKm = b.etMinProfitPerKm.text.toString().toDouble(),
-                minProfitPerHour = b.etMinProfitPerHour.text.toString().toDouble(),
-                maxPickupKm = b.etMaxPickupKm.text.toString().toDouble(),
-                maxTripKm = b.etMaxTripKm.text.toString().toDouble(),
-                maxTotalMinutes = b.etMaxTotalMinutes.text.toString().toInt(),
-                minPassengerRating = b.etMinPassengerRating.text.toString().toDouble(),
-                maxPickupTripRatio = 1.0, // default if not exposed in UI
+                consumptionKmPerUnit = b.etConsumption.parseNumeric(),
+                fuelUnitId = if (b.rbGallon.isChecked) 1 else 0,
+                fuelPricePerUnit = b.etFuelPrice.parseNumeric(),
+                maintenancePerKm = b.etMaintenancePerKm.parseNumeric(),
+                manualCostPerKm = b.etManualCostPerKm.parseNumeric(),
+                avgSpeed = b.etAvgSpeed.parseNumeric(),
+                minFare = b.etMinFare.parseNumeric(),
+                minNetProfit = b.etMinNetProfit.parseNumeric(),
+                minProfitPerKm = b.etMinProfitPerKm.parseNumeric(),
+                minProfitPerHour = b.etMinProfitPerHour.parseNumeric(),
+                maxPickupKm = b.etMaxPickupKm.parseNumeric(),
+                maxTripKm = b.etMaxTripKm.parseNumeric(),
+                maxTotalMinutes = b.etMaxTotalMinutes.parseNumeric().toInt(),
+                minPassengerRating = b.etMinPassengerRating.parseNumeric(),
+                maxPickupTripRatio = 1.0,
                 blacklistEnabled = b.switchBlacklist.isChecked,
                 autoAcceptEnabled = b.switchAutoAccept.isChecked,
-                aiEnabled = b.switchAi.isChecked
+                aiEnabled = b.switchAi.isChecked,
+                deadheadThresholdKm = b.etDeadheadThresholdKm.parseNumeric()
             )
             Toast.makeText(this, R.string.saved_successfully, Toast.LENGTH_SHORT).show()
-        } catch (e: NumberFormatException) {
-            Toast.makeText(this, "Error: valores numéricos inválidos", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -125,4 +202,8 @@ class SettingsActivity : AppCompatActivity() {
             .setNegativeButton("Cancelar", null)
             .show()
     }
+
+    /** Extrae número desde EditText, tanto con coma como con punto (locales ES). */
+    private fun EditText.parseNumeric(): Double =
+        text.toString().trim().replace(',', '.').toDouble()
 }

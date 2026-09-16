@@ -47,12 +47,36 @@ class ConfigRepository @Inject constructor(
     suspend fun getAllBlacklist(): List<BlacklistEntryEntity> = blacklistDao.getAll()
     suspend fun addBlacklistEntry(entry: BlacklistEntryEntity) { blacklistDao.insert(entry) }
     suspend fun removeBlacklistEntry(entry: BlacklistEntryEntity) { blacklistDao.delete(entry) }
+    suspend fun removeBlacklistEntriesForZone(zoneName: String) {
+        blacklistDao.deleteByReasonPattern("%Auto-extracted from zone '$zoneName'%")
+    }
+
+    /**
+     * Retorna TODAS las keywords de la lista negra:
+     * - Keywords manuales (blacklist_entry)
+     * - Keywords extraídas automáticamente de polígonos (extracted_keywords_json de cada zona)
+     * - Nombres de zona (como fallback para match por texto)
+     *
+     * Duplicados se eliminan automáticamente.
+     */
+    suspend fun getAllMergedBlacklistKeywords(): List<String> {
+        val allKeywords = blacklistDao.getAllKeywords().toMutableSet()
+        val zones = blacklistZoneDao.getAll()
+
+        for (zone in zones) {
+            allKeywords.add(zone.name)
+            zone.extractedKeywords.forEach { kw -> allKeywords.add(kw) }
+        }
+
+        return allKeywords.toList()
+    }
 
     // ── Blacklist Zones (mapa) ──
     suspend fun getAllBlacklistZones(): List<BlacklistZoneEntity> = blacklistZoneDao.getAll()
     fun getBlacklistZonesFlow(): Flow<List<BlacklistZoneEntity>> = blacklistZoneDao.getAllFlow()
     suspend fun getAllBlacklistZoneNames(): List<String> = blacklistZoneDao.getAllNames()
-    suspend fun addBlacklistZone(zone: BlacklistZoneEntity) { blacklistZoneDao.insert(zone) }
+    suspend fun addBlacklistZone(zone: BlacklistZoneEntity): Long = blacklistZoneDao.insert(zone)
+    suspend fun updateBlacklistZone(zone: BlacklistZoneEntity) { blacklistZoneDao.update(zone) }
     suspend fun removeBlacklistZone(zone: BlacklistZoneEntity) { blacklistZoneDao.delete(zone) }
     suspend fun removeBlacklistZoneById(id: Int) { blacklistZoneDao.deleteById(id) }
 }

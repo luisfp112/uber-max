@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_primary"
@@ -24,7 +25,7 @@
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_revert"
-                android:tint="@color/text_primary"
+                app:tint="@color/text_primary"
                 android:contentDescription="Volver" />
             <TextView
                 android:layout_width="wrap_content"
@@ -49,7 +50,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Nombre del vehículo"
+            android:hint="Nombre del vehículo (ej: Corolla 2020)"
             android:layout_marginBottom="6dp"
             android:textColorHint="@color/text_tertiary">
             <com.google.android.material.textfield.TextInputEditText
@@ -63,11 +64,76 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Costo por km (USD)"
+            android:hint="Consumo (km por litro o galón)"
             android:layout_marginBottom="6dp"
             android:textColorHint="@color/text_tertiary">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_cost_per_km"
+                android:id="@+id/et_consumption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- RadioGroup: litro vs galón -->
+        <RadioGroup
+            android:id="@+id/rg_fuel_unit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp"
+            android:paddingStart="4dp">
+            <RadioButton
+                android:id="@+id/rb_liter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Litro (L)"
+                android:textColor="@color/text_primary"
+                android:layout_marginEnd="24dp" />
+            <RadioButton
+                android:id="@+id/rb_gallon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Galón (gal)"
+                android:textColor="@color/text_primary" />
+        </RadioGroup>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Precio de combustible ($/unidad)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_fuel_price"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Mantenimiento/depreciación ($/km)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_maintenance_per_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Costo manual por km (0 = automático)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_manual_cost_per_km"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_primary"
@@ -102,38 +168,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Tarifa mínima ($)"
-            android:layout_marginBottom="6dp"
-            android:textColorHint="@color/text_tertiary">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_min_fare"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/text_primary"
-                android:inputType="numberDecimal" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Mín $/km (tarifa bruta)"
-            android:layout_marginBottom="6dp"
-            android:textColorHint="@color/text_tertiary">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_min_fare_per_km"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/text_primary"
-                android:inputType="numberDecimal" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Mín $/hora (tarifa bruta)"
             android:layout_marginBottom="16dp"
             android:textColorHint="@color/text_tertiary">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_min_fare_per_hour"
+                android:id="@+id/et_min_fare"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_primary"
@@ -151,11 +189,15 @@
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_max_pickup_km"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Máx recogida (km)"
             android:layout_marginBottom="6dp"
-            android:textColorHint="@color/text_tertiary">
+            android:textColorHint="@color/text_tertiary"
+            app:endIconMode="custom"
+            app:endIconDrawable="@android:drawable/ic_menu_info_details"
+            app:endIconTint="@color/info">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_max_pickup_km"
                 android:layout_width="match_parent"
@@ -165,11 +207,15 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_max_trip_km"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Máx viaje (km)"
             android:layout_marginBottom="6dp"
-            android:textColorHint="@color/text_tertiary">
+            android:textColorHint="@color/text_tertiary"
+            app:endIconMode="custom"
+            app:endIconDrawable="@android:drawable/ic_menu_info_details"
+            app:endIconTint="@color/info">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_max_trip_km"
                 android:layout_width="match_parent"
@@ -192,6 +238,20 @@
                 android:inputType="number" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Umbral vuelta vacía (km, ej: 8)"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_deadhead_threshold_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
         <!-- ═══ FILTROS DE PASAJERO ═══ -->
         <TextView
             android:layout_width="wrap_content"
@@ -203,11 +263,15 @@
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_min_passenger_rating"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Rating mínimo (0=desactivado)"
             android:layout_marginBottom="16dp"
-            android:textColorHint="@color/text_tertiary">
+            android:textColorHint="@color/text_tertiary"
+            app:endIconMode="custom"
+            app:endIconDrawable="@android:drawable/ic_menu_info_details"
+            app:endIconTint="@color/info">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_min_passenger_rating"
                 android:layout_width="match_parent"
@@ -227,11 +291,15 @@
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_min_net_profit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Ganancia neta mínima ($)"
             android:layout_marginBottom="6dp"
-            android:textColorHint="@color/text_tertiary">
+            android:textColorHint="@color/text_tertiary"
+            app:endIconMode="custom"
+            app:endIconDrawable="@android:drawable/ic_menu_info_details"
+            app:endIconTint="@color/info">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_min_net_profit"
                 android:layout_width="match_parent"
@@ -241,11 +309,15 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_min_profit_per_km"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Mín ganancia neta $/km"
             android:layout_marginBottom="6dp"
-            android:textColorHint="@color/text_tertiary">
+            android:textColorHint="@color/text_tertiary"
+            app:endIconMode="custom"
+            app:endIconDrawable="@android:drawable/ic_menu_info_details"
+            app:endIconTint="@color/info">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_min_profit_per_km"
                 android:layout_width="match_parent"

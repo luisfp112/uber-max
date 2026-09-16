@@ -2,6 +2,7 @@ package com.ubermax.app.data.db.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.ubermax.app.util.TextNormalizer
 
@@ -13,7 +14,10 @@ import com.ubermax.app.util.TextNormalizer
  * dirección de destino/recogida se hace con texto NORMALIZADO mediante
  * [TextNormalizer], ignorando mayúsculas, tildes y caracteres especiales.
  */
-@Entity(tableName = "blacklist_entry")
+@Entity(
+    tableName = "blacklist_entry",
+    indices = [Index(value = ["keyword"])]
+)
 data class BlacklistEntryEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,

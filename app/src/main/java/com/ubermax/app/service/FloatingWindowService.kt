@@ -17,7 +17,9 @@ import androidx.core.app.ServiceCompat
 import com.ubermax.app.R
 import com.ubermax.app.UberMaxApplication
 import com.ubermax.app.domain.model.Action
+import com.ubermax.app.domain.model.DecisionReason
 import com.ubermax.app.domain.model.OfferDecision
+import com.ubermax.app.domain.model.ReasonMapper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -261,23 +263,24 @@ class FloatingWindowService : Service() {
         if (action == Action.ACCEPT) return getString(R.string.hud_reason_accepted)
 
         val filter = decision.failedFilters.firstOrNull() ?: return ""
-        val text = filter.trim().replace(Regex("^[\\p{So}\\p{M}\\s]+"), "")
+        val text = ReasonMapper.clean(filter)
         if (text.isEmpty()) return ""
 
-        return when {
-            text.contains("Tarifa baja", ignoreCase = true) -> getString(R.string.hud_reason_low_fare)
-            text.contains("Ganancia neta", ignoreCase = true) -> getString(R.string.hud_reason_low_net)
-            text.contains("\$/km bajo", ignoreCase = true) -> getString(R.string.hud_reason_low_per_km)
-            text.contains("\$/hr", ignoreCase = true) -> getString(R.string.hud_reason_low_per_hour)
-            text.contains("Pickup lejos", ignoreCase = true) -> getString(R.string.hud_reason_pickup_far)
-            text.contains("Viaje largo", ignoreCase = true) -> getString(R.string.hud_reason_trip_long)
-            text.contains("Tiempo largo", ignoreCase = true) -> getString(R.string.hud_reason_trip_long)
-            text.contains("Rating bajo", ignoreCase = true) -> getString(R.string.hud_reason_low_rating)
-            text.contains("Vuelta vacía", ignoreCase = true) -> getString(R.string.hud_reason_deadhead)
-            text.contains("LISTA NEGRA", ignoreCase = true) -> getString(R.string.hud_reason_blacklist)
-            text.contains("Auto-accept", ignoreCase = true) -> getString(R.string.hud_reason_auto_accept_off)
-            else -> text
-        }
+        val reason = ReasonMapper.map(text) ?: return text
+        return getReasonLabel(reason)
+    }
+
+    private fun getReasonLabel(reason: DecisionReason): String = when (reason) {
+        DecisionReason.LOW_FARE -> getString(R.string.hud_reason_low_fare)
+        DecisionReason.LOW_NET -> getString(R.string.hud_reason_low_net)
+        DecisionReason.LOW_PER_KM -> getString(R.string.hud_reason_low_per_km)
+        DecisionReason.LOW_PER_HOUR -> getString(R.string.hud_reason_low_per_hour)
+        DecisionReason.PICKUP_FAR -> getString(R.string.hud_reason_pickup_far)
+        DecisionReason.TRIP_LONG -> getString(R.string.hud_reason_trip_long)
+        DecisionReason.LOW_RATING -> getString(R.string.hud_reason_low_rating)
+        DecisionReason.DEADHEAD -> getString(R.string.hud_reason_deadhead)
+        DecisionReason.BLACKLIST -> getString(R.string.hud_reason_blacklist)
+        DecisionReason.AUTO_ACCEPT_OFF -> getString(R.string.hud_reason_auto_accept_off)
     }
 
     private fun updateNetProfit(view: View, netProfit: Double) {

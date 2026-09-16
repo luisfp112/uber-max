@@ -4,7 +4,9 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.ubermax.app.R
@@ -25,11 +27,22 @@ class MonitorForegroundService : Service() {
         const val ACTION_START = "com.ubermax.app.START_MONITOR"
         const val ACTION_STOP = "com.ubermax.app.STOP_MONITOR"
 
+        // Timeout máximo: 4 horas. Se re-adquiere con cada evento procesado
+        // por UberAccessibilityService.processEvent() para evitar que un fallo
+        // inesperado deje el lock activo consumiendo batería para siempre.
+        private const val WAKE_LOCK_TIMEOUT_MS = 4 * 60 * 60 * 1000L
+
+        // Cada 55 minutos se re-adquiere el lock para que nunca expire mientras
+        // el servicio siga activo (el timeout es la red de seguridad, no el plan).
+        private const val WAKE_LOCK_RENEW_MS = 55 * 60 * 1000L
+
         var isRunning = false
             private set
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private val wakeLockHandler = Handler(Looper.getMainLooper())
+    private val renewWakeLock: Runnable = Runnable { acquireWakeLock() }
 
     override fun onCreate() {
         super.onCreate()
@@ -46,6 +59,7 @@ class MonitorForegroundService : Service() {
 
         startForeground(NOTIFICATION_ID, createNotification())
         acquireWakeLock()
+        wakeLockHandler.postDelayed(renewWakeLock, WAKE_LOCK_RENEW_MS)
 
         return START_STICKY
     }
@@ -79,21 +93,50 @@ class MonitorForegroundService : Service() {
 
     private fun acquireWakeLock() {
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
-        wakeLock = powerManager.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "UberMax::MonitorWakeLock"
-        ).apply {
-            acquire(10 * 60 * 60 * 1000L) // 10 horas máximo
+
+        // Niveles no soportados (p. ej. dispositivos low-power) → operar sin lock
+        if (!powerManager.isWakeLockLevelSupported(PowerManager.PARTIAL_WAKE_LOCK)) return
+
+        // Liberar el anterior si existe (para no fugar locks)
+        wakeLock?.let {
+            if (it.isHeld) it.release()
         }
+
+        try {
+            val lock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "UberMax::MonitorWakeLock"
+            )
+            if (!lock.isHeld) {
+                // Tiempo máximo para garantizar que un fallo inesperado nunca
+                // deje el dispositivo con batería drenándose de forma indefinida.
+                lock.acquire(WAKE_LOCK_TIMEOUT_MS)
+            }
+            wakeLock = lock
+        } catch (e: SecurityException) {
+            // Sin permiso WAKE_LOCK (p. ej. revoked) → el servicio sigue activo
+            // sin wake lock; la operación no debe crashear por esto.
+            wakeLock = null
+        } catch (e: RuntimeException) {
+            // newWakeLock/acquire pueden fallar en ROMs agresivas → degradar
+            // con elegancia en lugar de tumbar el foreground service.
+            wakeLock = null
+        }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+        }
+        wakeLock = null
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         isRunning = false
-        wakeLock?.let {
-            if (it.isHeld) it.release()
-        }
+        wakeLockHandler.removeCallbacks(renewWakeLock)
+        releaseWakeLock()
         super.onDestroy()
     }
 }

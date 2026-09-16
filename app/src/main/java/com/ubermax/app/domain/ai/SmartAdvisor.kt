@@ -1,8 +1,8 @@
 package com.ubermax.app.domain.ai
 
 import com.ubermax.app.data.db.entity.TripLogEntity
-import com.ubermax.app.data.repository.TripRepository
 import com.ubermax.app.domain.model.OfferDecision
+import com.ubermax.app.domain.port.TripHistorySource
 import kotlinx.coroutines.flow.firstOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,18 +16,31 @@ import javax.inject.Singleton
  */
 @Singleton
 class SmartAdvisor @Inject constructor(
-    private val tripRepository: TripRepository
+    private val tripHistory: TripHistorySource
 ) {
 
     suspend fun analyzeOffer(decision: OfferDecision): OfferDecision {
         val offer = decision.evaluatedOffer.offer
-        val eval = decision.evaluatedOffer
 
         // 1. Obtener historial reciente para contexto
         val recentTrips = try {
-            tripRepository.getAllTripsFlow().firstOrNull() ?: emptyList()
+            tripHistory.getAllTripsFlow().firstOrNull() ?: emptyList()
         } catch (e: Exception) {
+            // No distinguimos el tipo de error aquí: el flujo baja a "sin datos"
+            // (confianza 0.1) en ambos casos. Solo logueamos para diagnosticar
+            // si la DB falla de verdad en producción.
+            com.ubermax.app.util.Logs.e("SmartAdvisor", "Error accediendo al historial: ${e.message}", e)
             emptyList()
+        }
+
+        // CANCEL es mandatorio: el conductor configuró un bloqueo duro (lista
+        // negra). La IA SIEMPRE lo confirma a máxima confianza, incluso sin
+        // historial, para no relajar un auto-rechazo ya decidido.
+        if (decision.isCancelled) {
+            return decision.copy(
+                aiRecommendation = "IA: Rechazo mandatorio confirmado",
+                aiConfidence = 1.0
+            )
         }
 
         if (recentTrips.isEmpty()) {
@@ -60,9 +73,6 @@ class SmartAdvisor @Inject constructor(
                 recommendation = "Mejor rechazar: Zona mala + filtros fallidos"
                 confidence = 0.9
             }
-        } else if (decision.isCancelled) {
-            recommendation = "IA: Rechazo mandatorio confirmado"
-            confidence = 1.0
         }
 
         return decision.copy(

@@ -24,4 +24,7 @@ interface BlacklistDao {
 
     @Query("SELECT * FROM blacklist_entry ORDER BY keyword ASC")
     suspend fun getAll(): List<BlacklistEntryEntity>
+
+    @Query("DELETE FROM blacklist_entry WHERE reason LIKE :zoneNamePattern")
+    suspend fun deleteByReasonPattern(zoneNamePattern: String)
 }

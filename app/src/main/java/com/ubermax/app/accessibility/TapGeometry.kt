@@ -46,6 +46,20 @@ object TapGeometry {
 
     fun centerOf(rect: RectSpec): Pair<Int, Int> = rect.centerX to rect.centerY
 
+    /**
+     * Punto de toque RELATIVO dentro de [rect] (botón/ventana visible).
+     *
+     * Convención: (0,0) = esquina superior izquierda, (1,1) = inferior derecha.
+     * Se usa para:
+     *  - tocar el CENTRO exacto de un botón visible → relativePointIn(boton, 0.5f, 0.5f)
+     *  - tocar un punto dentro de la tarjeta sin depender del nodo clicable exacto.
+     *
+     * Ej. relativePointIn(RectSpec(0,0,1000,200), 0.5f, 0.5f) → (500, 100).
+     */
+    fun relativePointIn(rect: RectSpec, xRatio: Float, yRatio: Float): Pair<Int, Int> =
+        (rect.left + (rect.width * xRatio).toInt()) to
+                (rect.top + (rect.height * yRatio).toInt())
+
     // ═══════════════════════════════════════════════════════
     // Puntos de toque de RESERVA (solo cuando no se detectó ningún nodo).
     // Proporciones relativas: se multiplican por las métricas reales de pantalla

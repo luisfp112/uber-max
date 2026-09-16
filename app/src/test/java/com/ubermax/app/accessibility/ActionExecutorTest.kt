@@ -46,6 +46,21 @@ class ActionExecutorTest {
     }
 
     @Test
+    fun `reconoce variantes adicionales de oferta abierta`() {
+        assertTrue(ActionExecutor.matchesAcceptText("Disponible"))
+        assertTrue(ActionExecutor.matchesAcceptText("VIAJE DISPONIBLE"))
+        assertTrue(ActionExecutor.matchesAcceptText("Solicitar viaje"))
+        assertTrue(ActionExecutor.matchesAcceptText("Solicitar"))
+        assertTrue(ActionExecutor.matchesAcceptText("Solicita"))
+        assertTrue(ActionExecutor.matchesAcceptText("Solicito"))
+        assertTrue(ActionExecutor.matchesAcceptText("Apuntarme"))
+        assertTrue(ActionExecutor.matchesAcceptText("Participar"))
+        assertTrue(ActionExecutor.matchesAcceptText("Request trip"))
+        assertTrue(ActionExecutor.matchesAcceptText("Request"))
+        assertTrue(ActionExecutor.matchesAcceptText("Join"))
+    }
+
+    @Test
     fun `no confunde botones de rechazo con aceptar`() {
         assertFalse(ActionExecutor.matchesAcceptText("Rechazar"))
         assertFalse(ActionExecutor.matchesAcceptText("Cerrar"))
@@ -208,5 +223,29 @@ class ActionExecutorTest {
 
         val bigButton = RectSpec(400, 1600, 900, 1850)
         assertFalse(TapGeometry.isDismissSized(bigButton, screen1080x2400))
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  relativePointIn — tap centrado dentro de un botón visible
+    // ═══════════════════════════════════════════════════════
+
+    @Test
+    fun `relativePointIn centro de un boton`() {
+        val btn = RectSpec(200, 600, 800, 700) // 600×100
+        val (x, y) = TapGeometry.relativePointIn(btn, 0.5f, 0.5f)
+        assertEquals(500, x) // 200 + 600*0.5 = 500
+        assertEquals(650, y) // 600 + 100*0.5 = 650
+    }
+
+    @Test
+    fun `relativePointIn esquina superior izquierda`() {
+        val r = RectSpec(100, 100, 500, 500)
+        assertEquals(100 to 100, TapGeometry.relativePointIn(r, 0f, 0f))
+    }
+
+    @Test
+    fun `relativePointIn esquina inferior derecha`() {
+        val r = RectSpec(100, 100, 500, 500)
+        assertEquals(500 to 500, TapGeometry.relativePointIn(r, 1f, 1f))
     }
 }

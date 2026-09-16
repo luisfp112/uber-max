@@ -31,6 +31,18 @@
     <string name="save">Guardar</string>
     <string name="saved_successfully">Configuración guardada</string>
 
+    <!-- Ayuda contextual de filtros -->
+    <string name="help_max_pickup_title">Distancia máxima de recogida</string>
+    <string name="help_max_pickup_body">¿A qué distancia máxima (en km) puede estar el pasajero desde tu posición para que Uber Max acepte el viaje?\n\nUnidad: kilómetros (km). Si el pasajero queda a más distancia de la que establezcas, el viaje será rechazado.\n\nEjemplo: si pones 3, un pasajero a 4 km de ti será rechazado; uno a 2 km será aceptado.</string>
+    <string name="help_max_trip_title">Distancia máxima del viaje</string>
+    <string name="help_max_trip_body">¿Cuál es la distancia máxima (en km) que estás dispuesto a recorrer durante el viaje?\n\nUnidad: kilómetros (km). Los viajes más largos que este valor serán rechazados.\n\nEjemplo: si pones 25, un viaje de 40 km será rechazado; uno de 15 km será aceptado.</string>
+    <string name="help_rating_title">Rating mínimo del pasajero</string>
+    <string name="help_rating_body">¿Cuál es la calificación mínima (en estrellas, de 1 a 5) que debe tener el pasajero?\n\nUnidad: estrellas (0.0 a 5.0). Usa 0 para desactivar este filtro.\n\nEjemplo: si pones 4.5, aceptarás pasajeros con 4.5★ o más; los de 4.0★ serán rechazados.</string>
+    <string name="help_net_profit_title">Ganancia mínima por viaje</string>
+    <string name="help_net_profit_body">Define cuánto dinero (en USD) debe generar un viaje para que Uber Max lo considere rentable.\n\nEste valor ya resta el costo del combustible y el mantenimiento de tu vehículo.\n\nUnidad: dólares ($).\n\nEjemplo: si estableces $5, cualquier viaje que genere menos de $5 de ganancia neta será rechazado.</string>
+    <string name="help_profit_km_title">Ganancia neta mínima por km</string>
+    <string name="help_profit_km_body">Define cuánta ganancia neta (en USD) debe dejar cada kilómetro recorrido.\n\nUnidad: $/km.\n\nEjemplo: si pones $0.20/km, un viaje que deje $0.12/km será rechazado; uno que deje $0.30/km será aceptado.</string>
+
     <!-- Blacklist -->
     <string name="add_blacklist_entry">Agregar palabra clave</string>
     <string name="keyword">Palabra clave</string>
@@ -83,4 +95,11 @@
     <string name="stop_monitoring">Detener Monitoreo</string>
     <string name="export_csv">Exportar CSV</string>
     <string name="no_data">Sin datos disponibles</string>
+    <string name="dashboard_stats_title">Hoy</string>
+    <string name="exporting_csv">Generando CSV…</string>
+    <string name="export_empty">No hay viajes para exportar todavía</string>
+    <string name="best_hours_empty">Aún sin historial para analizar mejores horas</string>
+    <string name="best_zones_empty">Aún sin historial para analizar mejores zonas</string>
+    <string name="hour_stat_line">%1$d:00 — $%2$.2f (%3$d viajes)</string>
+    <string name="zone_stat_line">%1$s — $%2$.2f/km (%3$d viajes)</string>
 </resources>

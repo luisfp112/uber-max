@@ -8,13 +8,8 @@ import androidx.room.PrimaryKey
  * Filtros estilo Maxymo para la evaluación automática de ofertas.
  * Todos los valores monetarios en USD. Distancias en km.
  *
- * Valores por defecto calculados para maximizar ganancias en Ambato, Ecuador
- * conduciendo un Chevrolet Spark 2008 1.0L:
- * - Costo combustible: ~$0.08 USD/km
- * - Velocidad promedio urbana: ~22 km/h
- * - Tarifa Uber Ambato promedio: ~$1.50-3.00 USD por viaje corto
- *
- * Los defaults rechazan viajes que cuestan más en gasolina de lo que generan.
+ * Filtros para evaluar la rentabilidad de las ofertas de Uber.
+ * Se ajustan según el costo real del conductor (ver VehicleConfigEntity).
  * Valor 0 = filtro desactivado.
  */
 @Entity(tableName = "filter_rules")
@@ -65,5 +60,9 @@ data class FilterRulesEntity(
 
     // ── IA ──
     @ColumnInfo(name = "ai_enabled")
-    val aiEnabled: Boolean = true            // Activar recomendaciones IA
+    val aiEnabled: Boolean = true,           // Activar recomendaciones IA
+
+    // ── Deadhead ──
+    @ColumnInfo(name = "deadhead_threshold_km")
+    val deadheadThresholdKm: Double = 8.0    // Umbral de km para aplicar penalización de vuelta vacía
 )
