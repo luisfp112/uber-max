@@ -8,7 +8,8 @@ data class OfferDecision(
     val action: Action,
     val failedFilters: List<String> = emptyList(), // Nombres de filtros que fallaron
     val aiRecommendation: String = "",             // Recomendación de la IA
-    val aiConfidence: Double = 0.0                 // Confianza de la IA (0.0-1.0)
+    val aiConfidence: Double = 0.0,                // Confianza de la IA (0.0-1.0)
+    val simulated: Boolean = false                 // true = modo simulación (sin taps)
 ) {
     val isAccepted: Boolean get() = action == Action.ACCEPT
     val isCancelled: Boolean get() = action == Action.CANCEL

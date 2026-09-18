@@ -18,8 +18,9 @@ import com.ubermax.app.R
 import com.ubermax.app.UberMaxApplication
 import com.ubermax.app.domain.model.Action
 import com.ubermax.app.domain.model.DecisionReason
+import com.ubermax.app.domain.model.HudReason
+import com.ubermax.app.domain.model.HudReasonFormatter
 import com.ubermax.app.domain.model.OfferDecision
-import com.ubermax.app.domain.model.ReasonMapper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -213,8 +214,8 @@ class FloatingWindowService : Service() {
         val eval = decision.evaluatedOffer
         val action = decision.action
 
-        updateDecisionBadge(view, action)
-        updateReason(view, decision, action)
+        updateDecisionBadge(view, action, decision.simulated)
+        updateReason(view, decision)
         updateNetProfit(view, eval.netProfit)
         view.findViewById<TextView>(R.id.tv_profit_per_km)?.text = "\$%.2f/km".format(eval.profitPerKm)
         updateDestination(view, offer.destination)
@@ -228,7 +229,7 @@ class FloatingWindowService : Service() {
         }
     }
 
-    private fun updateDecisionBadge(view: View, action: Action) {
+    private fun updateDecisionBadge(view: View, action: Action, simulated: Boolean) {
         val badge = view.findViewById<TextView>(R.id.tv_decision)
         when (action) {
             Action.ACCEPT -> {
@@ -248,27 +249,27 @@ class FloatingWindowService : Service() {
                 badge.setBackgroundResource(R.drawable.hud_badge_reject)
             }
         }
+        if (simulated) {
+            badge.text = "${badge.text} · ${getString(R.string.hud_simulation)}"
+        }
     }
 
-    private fun updateReason(view: View, decision: OfferDecision, action: Action) {
+    private fun updateReason(view: View, decision: OfferDecision) {
         val tvReason = view.findViewById<TextView>(R.id.tv_reason)
-        val reason = mainReason(decision, action)
+        val reason = mainReason(decision)
         tvReason.text = reason
         tvReason.visibility = if (reason.isBlank()) View.GONE else View.VISIBLE
     }
 
     /** Motivo principal de la decisión en una sola línea legible. */
-    private fun mainReason(decision: OfferDecision, action: Action): String {
-        if (action == Action.CANCEL) return getString(R.string.hud_reason_blacklist)
-        if (action == Action.ACCEPT) return getString(R.string.hud_reason_accepted)
-
-        val filter = decision.failedFilters.firstOrNull() ?: return ""
-        val text = ReasonMapper.clean(filter)
-        if (text.isEmpty()) return ""
-
-        val reason = ReasonMapper.map(text) ?: return text
-        return getReasonLabel(reason)
-    }
+    private fun mainReason(decision: OfferDecision): String =
+        when (val reason = HudReasonFormatter.mainReason(decision)) {
+            HudReason.Accepted -> getString(R.string.hud_reason_accepted)
+            HudReason.Blacklist -> getString(R.string.hud_reason_blacklist)
+            is HudReason.Raw -> reason.text
+            is HudReason.Known -> getReasonLabel(reason.reason)
+            HudReason.None -> ""
+        }
 
     private fun getReasonLabel(reason: DecisionReason): String = when (reason) {
         DecisionReason.LOW_FARE -> getString(R.string.hud_reason_low_fare)
@@ -295,13 +296,8 @@ class FloatingWindowService : Service() {
     private fun updateDestination(view: View, destination: String) {
         val tvDest = view.findViewById<TextView>(R.id.tv_destination)
         val text = if (destination.isBlank()) getString(R.string.hud_no_destination)
-                   else abbreviate(destination)
+                   else HudReasonFormatter.abbreviateDestination(destination)
         tvDest.text = "📍 $text"
-    }
-
-    private fun abbreviate(destination: String): String {
-        val first = destination.split(",", " - ").first().trim()
-        return if (first.length <= 22) first else first.take(20).trimEnd() + "…"
     }
 
     private fun removeOverlay() {

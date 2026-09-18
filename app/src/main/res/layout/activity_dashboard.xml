@@ -248,6 +248,16 @@
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_history"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="@string/open_history"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/bg_tertiary"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_export_csv"
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="match_parent"

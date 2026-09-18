@@ -13,6 +13,21 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+
+    <!-- Visibilidad de paquetes en Android 11+ (para abrir/consultar Uber Driver) -->
+    <queries>
+        <package android:name="com.ubercab.driver" />
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:name=".UberMaxApplication"
@@ -36,9 +51,23 @@
             </intent-filter>
         </activity>
 
+        <!-- Onboarding de permisos (primera ejecución) -->
+        <activity
+            android:name=".ui.onboarding.OnboardingActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.dashboard.DashboardActivity"
+            android:theme="@style/Theme.UberMax" />
+
         <!-- Settings -->
         <activity
             android:name=".ui.settings.SettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.dashboard.DashboardActivity"
+            android:theme="@style/Theme.UberMax" />
+
+        <!-- Historial -->
+        <activity
+            android:name=".ui.history.HistoryActivity"
             android:exported="false"
             android:parentActivityName=".ui.dashboard.DashboardActivity"
             android:theme="@style/Theme.UberMax" />
@@ -67,13 +96,52 @@
         <service
             android:name=".service.MonitorForegroundService"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Monitoreo continuo de ofertas de Uber Driver para el conductor" />
+        </service>
 
         <!-- Floating Window (HUD) — foreground para no ser destruido bajo baja memoria -->
         <service
             android:name=".service.FloatingWindowService"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="HUD flotante con la última decision de UberMax" />
+        </service>
+
+        <!-- Control por voz (opt-in) -->
+        <service
+            android:name=".service.VoiceCommandService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Reconocimiento de voz para aceptar o rechazar ofertas" />
+        </service>
+
+        <!-- Auto-arranque tras reiniciar -->
+        <receiver
+            android:name=".service.BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Auto-arranque al conectar Bluetooth de auto -->
+        <receiver
+            android:name=".service.CarConnectionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Compartir exportaciones CSV -->
         <provider

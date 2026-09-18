@@ -4,6 +4,8 @@ import com.ubermax.app.data.db.dao.BlacklistDao
 import com.ubermax.app.data.db.dao.BlacklistZoneDao
 import com.ubermax.app.data.db.dao.FilterRulesDao
 import com.ubermax.app.data.db.dao.VehicleConfigDao
+import com.ubermax.app.data.db.dao.AppSettingsDao
+import com.ubermax.app.data.db.entity.AppSettingsEntity
 import com.ubermax.app.data.db.entity.BlacklistEntryEntity
 import com.ubermax.app.data.db.entity.BlacklistZoneEntity
 import com.ubermax.app.data.db.entity.FilterRulesEntity
@@ -17,7 +19,8 @@ class ConfigRepository @Inject constructor(
     private val vehicleConfigDao: VehicleConfigDao,
     private val filterRulesDao: FilterRulesDao,
     private val blacklistDao: BlacklistDao,
-    private val blacklistZoneDao: BlacklistZoneDao
+    private val blacklistZoneDao: BlacklistZoneDao,
+    private val appSettingsDao: AppSettingsDao
 ) {
     // ── Vehicle Config ──
     suspend fun getVehicleConfig(): VehicleConfigEntity {
@@ -79,4 +82,15 @@ class ConfigRepository @Inject constructor(
     suspend fun updateBlacklistZone(zone: BlacklistZoneEntity) { blacklistZoneDao.update(zone) }
     suspend fun removeBlacklistZone(zone: BlacklistZoneEntity) { blacklistZoneDao.delete(zone) }
     suspend fun removeBlacklistZoneById(id: Int) { blacklistZoneDao.deleteById(id) }
+
+    // ── App Settings (operativos) ──
+    suspend fun getAppSettings(): AppSettingsEntity {
+        return appSettingsDao.getSettings() ?: AppSettingsEntity().also {
+            appSettingsDao.insertOrUpdate(it)
+        }
+    }
+    fun getAppSettingsFlow(): Flow<AppSettingsEntity?> = appSettingsDao.getSettingsFlow()
+    suspend fun updateAppSettings(settings: AppSettingsEntity) {
+        appSettingsDao.insertOrUpdate(settings)
+    }
 }

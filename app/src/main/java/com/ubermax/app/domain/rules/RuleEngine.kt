@@ -58,24 +58,32 @@ class RuleEngine {
         // ═══════════════════════════════════════════════
         val failedFilters = mutableListOf<String>()
 
-        // ── Tarifa mínima ──
+        // Métrica de rentabilidad elegida por el conductor. Solo esta decide;
+        // la otra (km vs hora) se ignora aunque su umbral sea > 0.
+        val primaryMetric = ProfitMetric.fromKey(rules.primaryMetric)
+
+        // ── Tarifa mínima (guarda opcional, 0 = desactivado) ──
         if (rules.minFare > 0 && evaluated.offer.rawFare < rules.minFare) {
             failedFilters.add("💰 Tarifa baja: \$${f(evaluated.offer.rawFare)} < mín \$${f(rules.minFare)}")
         }
 
-        // ── Ganancia neta mínima ──
+        // ── Ganancia neta mínima (guarda opcional, 0 = desactivado) ──
         if (rules.minNetProfit > 0 && evaluated.netProfit < rules.minNetProfit) {
             failedFilters.add("📉 Ganancia neta baja: \$${f(evaluated.netProfit)} < mín \$${f(rules.minNetProfit)}")
         }
 
-        // ── Ganancia/km mínima ──
-        if (rules.minProfitPerKm > 0 && evaluated.profitPerKm < rules.minProfitPerKm) {
-            failedFilters.add("📏 \$/km bajo: \$${f(evaluated.profitPerKm)} < mín \$${f(rules.minProfitPerKm)}")
-        }
-
-        // ── Ganancia/hora mínima ──
-        if (rules.minProfitPerHour > 0 && evaluated.profitPerHour < rules.minProfitPerHour) {
-            failedFilters.add("⏱️ \$/hr bajo: \$${f(evaluated.profitPerHour)} < mín \$${f(rules.minProfitPerHour)}")
+        // ── Rentabilidad principal (por hora o por km) ──
+        when (primaryMetric) {
+            ProfitMetric.PER_KM -> {
+                if (rules.minProfitPerKm > 0 && evaluated.profitPerKm < rules.minProfitPerKm) {
+                    failedFilters.add("📏 \$/km bajo: \$${f(evaluated.profitPerKm)} < mín \$${f(rules.minProfitPerKm)}")
+                }
+            }
+            ProfitMetric.PER_HOUR -> {
+                if (rules.minProfitPerHour > 0 && evaluated.profitPerHour < rules.minProfitPerHour) {
+                    failedFilters.add("⏱️ \$/hr bajo: \$${f(evaluated.profitPerHour)} < mín \$${f(rules.minProfitPerHour)}")
+                }
+            }
         }
 
         // ── Distancia máxima de recogida ──
@@ -110,13 +118,16 @@ class RuleEngine {
         // El evaluador económico ya incluye la vuelta vacía en netProfit / profitPerKm /
         // profitPerHour cuando el viaje supera el umbral (ej: > 8 km). Por eso un viaje
         // largo NO se marca como fallido solo por la distancia: únicamente se reporta
-        // cuando la rentabilidad FINAL (ya con deadhead) cae bajo los mínimos del usuario.
-        if (evaluated.hasDeadheadPenalty && (rules.minNetProfit > 0 || rules.minProfitPerKm > 0 || rules.minProfitPerHour > 0)) {
+        // cuando la rentabilidad FINAL (ya con deadhead) cae bajo el mínimo principal
+        // (o la guarda de ganancia neta, si está activa).
+        if (evaluated.hasDeadheadPenalty) {
             val netBelowMin = rules.minNetProfit > 0 && evaluated.netProfit < rules.minNetProfit
-            val perKmBelowMin = rules.minProfitPerKm > 0 && evaluated.profitPerKm < rules.minProfitPerKm
-            val perHourBelowMin = rules.minProfitPerHour > 0 && evaluated.profitPerHour < rules.minProfitPerHour
+            val primaryBelowMin = when (primaryMetric) {
+                ProfitMetric.PER_KM -> rules.minProfitPerKm > 0 && evaluated.profitPerKm < rules.minProfitPerKm
+                ProfitMetric.PER_HOUR -> rules.minProfitPerHour > 0 && evaluated.profitPerHour < rules.minProfitPerHour
+            }
 
-            if (netBelowMin || perKmBelowMin || perHourBelowMin) {
+            if (netBelowMin || primaryBelowMin) {
                 failedFilters.add("🔙 Vuelta vacía ${f(evaluated.returnKm)}km: rentabilidad final bajo mínimos")
             }
         }

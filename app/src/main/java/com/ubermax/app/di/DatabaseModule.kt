@@ -23,7 +23,12 @@ object DatabaseModule {
             AppDatabase::class.java,
             "ubermax_db"
         )
-            .addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
+            .addMigrations(
+                AppDatabase.MIGRATION_5_6,
+                AppDatabase.MIGRATION_6_7,
+                AppDatabase.MIGRATION_7_8,
+                AppDatabase.MIGRATION_8_9
+            )
             .enableMultiInstanceInvalidation()
             .build()
     }
@@ -42,4 +47,7 @@ object DatabaseModule {
 
     @Provides
     fun provideBlacklistZoneDao(db: AppDatabase): BlacklistZoneDao = db.blacklistZoneDao()
+
+    @Provides
+    fun provideAppSettingsDao(db: AppDatabase): AppSettingsDao = db.appSettingsDao()
 }

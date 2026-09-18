@@ -72,7 +72,7 @@ class RuleEngineTest {
     fun `tarifa baja genera WARN con filtro de tarifa`() {
         val decision = ruleEngine.evaluate(
             evaluatedOffer(fare = 1.20, tripKm = 5.0),
-            FilterRulesEntity()
+            FilterRulesEntity(minFare = 1.50)
         )
 
         assertEquals(Action.WARN, decision.action)
@@ -157,7 +157,7 @@ class RuleEngineTest {
         assertTrue(evaluated.netProfit > FilterRulesEntity().minNetProfit)
         assertTrue(evaluated.profitPerKm < FilterRulesEntity().minProfitPerKm)
 
-        val decision = ruleEngine.evaluate(evaluated, FilterRulesEntity())
+        val decision = ruleEngine.evaluate(evaluated, FilterRulesEntity(primaryMetric = "PER_KM"))
 
         assertEquals(Action.WARN, decision.action)
         assertTrue(decision.failedFilters.any { it.contains("Vuelta vacía") })
@@ -177,7 +177,7 @@ class RuleEngineTest {
         assertTrue(evaluated.hasDeadheadPenalty)
         assertTrue(evaluated.netProfit < 0.0) // 3.00 - (41 × 0.08) = -0.28
 
-        val decision = ruleEngine.evaluate(evaluated, FilterRulesEntity())
+        val decision = ruleEngine.evaluate(evaluated, FilterRulesEntity(minNetProfit = 0.80))
 
         assertEquals(Action.WARN, decision.action)
         assertTrue(decision.failedFilters.any { it.contains("Vuelta vacía") })
@@ -379,5 +379,94 @@ class RuleEngineTest {
 
         val entryAccents = BlacklistEntryEntity(keyword = "Techo Propio")
         assertEquals("techo propio", entryAccents.normalizedKeyword)
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  MÉTRICA PRINCIPAL — solo la elegida decide
+    // ═══════════════════════════════════════════════════════
+
+    @Test
+    fun `modo por hora ignora el minimo por km`() {
+        // $/km = 0.145 (< 0.15) pero $/hr ≈ 6.96 (> 3.0): en modo hora debe ACEPTAR.
+        val evaluated = evaluatedOffer(
+            fare = 1.80,
+            pickupKm = 1.0,
+            tripKm = 7.0,
+            pickupMinutes = 2,
+            tripMinutes = 8,
+            estimatedMinutes = 10
+        )
+        assertTrue(evaluated.profitPerKm < 0.15)
+        assertTrue(evaluated.profitPerHour > 3.0)
+
+        val decision = ruleEngine.evaluate(evaluated, FilterRulesEntity(primaryMetric = "PER_HOUR"))
+
+        assertEquals(Action.ACCEPT, decision.action)
+        assertFalse(decision.failedFilters.any { it.contains("\$/km bajo") })
+    }
+
+    @Test
+    fun `modo por hora rechaza si baja la ganancia por hora`() {
+        // $/km = 0.42 (bueno) pero $/hr = 1.68 (< 3.0): en modo hora debe WARN.
+        val evaluated = evaluatedOffer(
+            fare = 2.00,
+            pickupKm = 1.0,
+            tripKm = 3.0,
+            pickupMinutes = 5,
+            tripMinutes = 55,
+            estimatedMinutes = 60
+        )
+        assertTrue(evaluated.profitPerKm > 0.15)
+        assertTrue(evaluated.profitPerHour < 3.0)
+
+        val decision = ruleEngine.evaluate(evaluated, FilterRulesEntity(primaryMetric = "PER_HOUR"))
+
+        assertEquals(Action.WARN, decision.action)
+        assertTrue(decision.failedFilters.any { it.contains("\$/hr bajo") })
+    }
+
+    @Test
+    fun `modo por km ignora el minimo por hora`() {
+        // Mismo viaje anterior: $/km bueno y $/hr bajo → en modo km debe ACEPTAR.
+        val evaluated = evaluatedOffer(
+            fare = 2.00,
+            pickupKm = 1.0,
+            tripKm = 3.0,
+            pickupMinutes = 5,
+            tripMinutes = 55,
+            estimatedMinutes = 60
+        )
+
+        val decision = ruleEngine.evaluate(evaluated, FilterRulesEntity(primaryMetric = "PER_KM"))
+
+        assertEquals(Action.ACCEPT, decision.action)
+        assertFalse(decision.failedFilters.any { it.contains("\$/hr bajo") })
+    }
+
+    @Test
+    fun `modo por km rechaza si baja la ganancia por km`() {
+        val evaluated = evaluatedOffer(
+            fare = 1.80,
+            pickupKm = 1.0,
+            tripKm = 7.0,
+            pickupMinutes = 2,
+            tripMinutes = 8,
+            estimatedMinutes = 10
+        )
+
+        val decision = ruleEngine.evaluate(evaluated, FilterRulesEntity(primaryMetric = "PER_KM"))
+
+        assertEquals(Action.WARN, decision.action)
+        assertTrue(decision.failedFilters.any { it.contains("\$/km bajo") })
+    }
+
+    @Test
+    fun `las guardas absolutas de tarifa y neto siguen aplicando en cualquier modo`() {
+        val rules = FilterRulesEntity(minFare = 5.0, minNetProfit = 4.0, primaryMetric = "PER_KM")
+        val decision = ruleEngine.evaluate(evaluatedOffer(fare = 2.00, tripKm = 3.0), rules)
+
+        assertEquals(Action.WARN, decision.action)
+        assertTrue(decision.failedFilters.any { it.contains("Tarifa baja") })
+        assertTrue(decision.failedFilters.any { it.contains("Ganancia neta baja") })
     }
 }

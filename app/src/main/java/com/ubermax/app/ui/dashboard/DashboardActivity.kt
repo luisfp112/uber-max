@@ -10,16 +10,21 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.ubermax.app.R
 import com.ubermax.app.databinding.ActivityDashboardBinding
 import com.ubermax.app.service.FloatingWindowService
 import com.ubermax.app.service.MonitorForegroundService
 import com.ubermax.app.service.UberAccessibilityService
+import com.ubermax.app.ui.history.HistoryActivity
 import com.ubermax.app.ui.settings.SettingsActivity
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Panel de control.
@@ -53,6 +58,10 @@ class DashboardActivity : AppCompatActivity() {
             exportCsv()
         }
 
+        binding.btnHistory.setOnClickListener {
+            startActivity(Intent(this, HistoryActivity::class.java))
+        }
+
         observeStats()
     }
 
@@ -64,30 +73,32 @@ class DashboardActivity : AppCompatActivity() {
 
     private fun observeStats() {
         lifecycleScope.launch {
-            viewModel.stats.collect { stats ->
-                binding.tvTodayNetProfit.text = "\$%.2f".format(stats.todayNetProfit)
-                binding.tvTodayNetProfit.setTextColor(
-                    ContextCompat.getColor(
-                        this@DashboardActivity,
-                        if (stats.todayNetProfit >= 0) R.color.profit_positive else R.color.profit_negative
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.stats.collect { stats ->
+                    binding.tvTodayNetProfit.text = "\$%.2f".format(stats.todayNetProfit)
+                    binding.tvTodayNetProfit.setTextColor(
+                        ContextCompat.getColor(
+                            this@DashboardActivity,
+                            if (stats.todayNetProfit >= 0) R.color.profit_positive else R.color.profit_negative
+                        )
                     )
-                )
-                binding.tvTodayOffers.text = stats.todayOffers.toString()
-                binding.tvTodayAccepted.text = stats.todayAccepted.toString()
+                    binding.tvTodayOffers.text = stats.todayOffers.toString()
+                    binding.tvTodayAccepted.text = stats.todayAccepted.toString()
 
-                binding.tvBestHours.text = if (stats.bestHours.isEmpty()) {
-                    getString(R.string.best_hours_empty)
-                } else {
-                    stats.bestHours.joinToString("\n") { h ->
-                        getString(R.string.hour_stat_line, h.hour_of_day, h.avgProfit, h.count)
+                    binding.tvBestHours.text = if (stats.bestHours.isEmpty()) {
+                        getString(R.string.best_hours_empty)
+                    } else {
+                        stats.bestHours.joinToString("\n") { h ->
+                            getString(R.string.hour_stat_line, h.hour_of_day, h.avgProfit, h.count)
+                        }
                     }
-                }
 
-                binding.tvBestZones.text = if (stats.bestZones.isEmpty()) {
-                    getString(R.string.best_zones_empty)
-                } else {
-                    stats.bestZones.joinToString("\n") { z ->
-                        getString(R.string.zone_stat_line, z.destination, z.avgProfitPerKm, z.count)
+                    binding.tvBestZones.text = if (stats.bestZones.isEmpty()) {
+                        getString(R.string.best_zones_empty)
+                    } else {
+                        stats.bestZones.joinToString("\n") { z ->
+                            getString(R.string.zone_stat_line, z.destination, z.avgProfitPerKm, z.count)
+                        }
                     }
                 }
             }
@@ -106,11 +117,14 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    private fun shareCsv(csv: String) {
-        val file = File(cacheDir, "ubermax_export.csv")
-        file.writeText(csv)
+    private suspend fun shareCsv(csv: String) {
+        // Escritura de archivo fuera del hilo principal (no bloquear la UI)
+        val uri: Uri = withContext(Dispatchers.IO) {
+            val file = File(cacheDir, "ubermax_export.csv")
+            file.writeText(csv)
+            FileProvider.getUriForFile(this@DashboardActivity, "$packageName.fileprovider", file)
+        }
 
-        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
         val share = Intent(Intent.ACTION_SEND).apply {
             type = "text/csv"
             putExtra(Intent.EXTRA_STREAM, uri)

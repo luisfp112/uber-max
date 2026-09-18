@@ -1,8 +1,10 @@
 package com.ubermax.app.domain.ai
 
 import com.ubermax.app.data.db.entity.TripLogEntity
+import com.ubermax.app.domain.model.HistoryResult
 import com.ubermax.app.domain.model.OfferDecision
 import com.ubermax.app.domain.port.TripHistorySource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.firstOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,19 +21,14 @@ class SmartAdvisor @Inject constructor(
     private val tripHistory: TripHistorySource
 ) {
 
-    suspend fun analyzeOffer(decision: OfferDecision): OfferDecision {
+    suspend fun analyzeOffer(
+        decision: OfferDecision,
+        goodProfitPerKm: Double = DEFAULT_GOOD_PROFIT_PER_KM
+    ): OfferDecision {
         val offer = decision.evaluatedOffer.offer
 
-        // 1. Obtener historial reciente para contexto
-        val recentTrips = try {
-            tripHistory.getAllTripsFlow().firstOrNull() ?: emptyList()
-        } catch (e: Exception) {
-            // No distinguimos el tipo de error aquí: el flujo baja a "sin datos"
-            // (confianza 0.1) en ambos casos. Solo logueamos para diagnosticar
-            // si la DB falla de verdad en producción.
-            com.ubermax.app.util.Logs.e("SmartAdvisor", "Error accediendo al historial: ${e.message}", e)
-            emptyList()
-        }
+        // 1. Obtener historial reciente para contexto (resultado tipado)
+        val historyResult = loadHistory()
 
         // CANCEL es mandatorio: el conductor configuró un bloqueo duro (lista
         // negra). La IA SIEMPRE lo confirma a máxima confianza, incluso sin
@@ -43,6 +40,14 @@ class SmartAdvisor @Inject constructor(
             )
         }
 
+        if (historyResult is HistoryResult.Failure) {
+            return decision.copy(
+                aiRecommendation = "IA: historial no disponible, decisión con reglas",
+                aiConfidence = 0.1
+            )
+        }
+
+        val recentTrips = (historyResult as HistoryResult.Success).trips
         if (recentTrips.isEmpty()) {
             return decision.copy(
                 aiRecommendation = "Necesita más datos para IA",
@@ -51,12 +56,12 @@ class SmartAdvisor @Inject constructor(
         }
 
         // 2. Analizar zona de destino
-        val destScore = calculateDestinationScore(offer.destination, recentTrips)
-        
+        val destScore = calculateDestinationScore(offer.destination, recentTrips, goodProfitPerKm)
+
         // 3. Generar recomendación basada en la decisión original y el análisis IA
         var recommendation = ""
         var confidence = 0.5
-        
+
         if (decision.isAccepted) {
             if (destScore < 0.3) {
                 recommendation = "Precaución: Destino históricamente poco rentable"
@@ -81,18 +86,34 @@ class SmartAdvisor @Inject constructor(
         )
     }
 
+    /** Lee el historial con manejo tipado de errores (no silencioso). */
+    private suspend fun loadHistory(): HistoryResult = try {
+        HistoryResult.Success(tripHistory.getAllTripsFlow().firstOrNull() ?: emptyList())
+    } catch (c: CancellationException) {
+        throw c
+    } catch (e: Exception) {
+        com.ubermax.app.util.Logs.e("SmartAdvisor", "Error accediendo al historial: ${e.message}", e)
+        HistoryResult.Failure(e)
+    }
+
     /**
      * Calcula un score (0.0 a 1.0) para un destino basado en el historial de viajes.
      * Evalúa si históricamente se gana bien ($/km) y si se suelen aceptar viajes hacia allá.
+     *
+     * [goodProfitPerKm] es la referencia configurable de "buena ganancia por km".
      */
-    private fun calculateDestinationScore(destination: String, history: List<TripLogEntity>): Double {
+    internal fun calculateDestinationScore(
+        destination: String,
+        history: List<TripLogEntity>,
+        goodProfitPerKm: Double = DEFAULT_GOOD_PROFIT_PER_KM
+    ): Double {
         if (destination.isBlank()) return 0.5
 
         // Buscar viajes similares en historial (coincidencia parcial básica)
         val term = destination.split(",").firstOrNull()?.trim()?.lowercase() ?: return 0.5
         if (term.length < 4) return 0.5
 
-        val matchingTrips = history.filter { 
+        val matchingTrips = history.filter {
             it.destination.lowercase().contains(term) || it.pickupAddress.lowercase().contains(term)
         }
 
@@ -108,9 +129,14 @@ class SmartAdvisor @Inject constructor(
         }
 
         // Score heurístico: 60% peso a profit, 40% a ratio de aceptación
-        // Asumiendo que un buen profit/km en Ambato es > $0.25
-        val profitScore = (avgProfitKm / 0.25).coerceIn(0.0, 1.0)
-        
+        val reference = if (goodProfitPerKm > 0.0) goodProfitPerKm else DEFAULT_GOOD_PROFIT_PER_KM
+        val profitScore = (avgProfitKm / reference).coerceIn(0.0, 1.0)
+
         return (profitScore * 0.6) + (acceptRatio * 0.4)
+    }
+
+    companion object {
+        /** Referencia histórica por defecto (Ambato): $0.25/km. */
+        const val DEFAULT_GOOD_PROFIT_PER_KM = 0.25
     }
 }

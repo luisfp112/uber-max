@@ -53,9 +53,14 @@ class OfferParser {
             """A\s?(\d+)\s?min\s?\((\d+[.,]?\d*)\s?km\)""", RegexOption.IGNORE_CASE
         )
 
-        // Patrón: "Viaje: 36 min (15.6 km)" — viaje
+        // Variante en inglés: "6 min (1.8 km) away" — recogida
+        private val PICKUP_PATTERN_EN = Regex(
+            """(\d+)\s?min\s?\((\d+[.,]?\d*)\s?km\)\s?away""", RegexOption.IGNORE_CASE
+        )
+
+        // Patrón: "Viaje: 36 min (15.6 km)" / "Trip: 36 min (15.6 km)" — viaje
         private val TRIP_PATTERN = Regex(
-            """Viaje:?\s?(\d+)\s?min\s?\((\d+[.,]?\d*)\s?km\)""", RegexOption.IGNORE_CASE
+            """(?:Viaje|Trip)\s?:?\s?(\d+)\s?min\s?\((\d+[.,]?\d*)\s?km\)""", RegexOption.IGNORE_CASE
         )
 
         // Patrón: "★ 4.73 (42)" o "4.73 ★" — rating
@@ -161,7 +166,7 @@ class OfferParser {
 
         for ((index, n) in nodes.withIndex()) {
             val combined = "${n.text} ${n.contentDesc}"
-            val match = PICKUP_PATTERN.find(combined)
+            val match = PICKUP_PATTERN.find(combined) ?: PICKUP_PATTERN_EN.find(combined)
             if (match != null) {
                 pickupMinutes = match.groupValues[1].toIntOrNull() ?: 0
                 pickupKm = RegexPatterns.parseDistance(match.groupValues[2])
@@ -353,6 +358,7 @@ class OfferParser {
             if (NON_ADDRESS_TEXTS.any { lower.startsWith("$it ") || lower.endsWith(" $it") || lower.contains(" $it ") }) return@forEachIndexed
             if (RegexPatterns.FARE_PATTERN.containsMatchIn(text)) return@forEachIndexed
             if (PICKUP_PATTERN.containsMatchIn(text)) return@forEachIndexed
+            if (PICKUP_PATTERN_EN.containsMatchIn(text)) return@forEachIndexed
             if (TRIP_PATTERN.containsMatchIn(text)) return@forEachIndexed
             if (text.matches(Regex("""[\d.,\$\s★]+"""))) return@forEachIndexed
 

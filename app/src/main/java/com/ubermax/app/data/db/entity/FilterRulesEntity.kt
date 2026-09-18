@@ -17,19 +17,26 @@ data class FilterRulesEntity(
     @PrimaryKey
     val id: Int = 1, // Singleton
 
-    // ── Filtros de Tarifa Bruta ──
+    // ── Filtros de Tarifa Bruta (guarda opcional, 0 = desactivado) ──
     @ColumnInfo(name = "min_fare")
-    val minFare: Double = 1.50,              // USD mínimo tarifa bruta
+    val minFare: Double = 0.0,               // USD mínimo tarifa bruta
+
+    // ── Métrica principal de rentabilidad ──
+    // "PER_HOUR" (default) o "PER_KM". Solo la métrica elegida decide;
+    // la otra se ignora aunque su umbral sea > 0.
+    @ColumnInfo(name = "primary_metric")
+    val primaryMetric: String = "PER_HOUR",
 
     // ── Filtros de Ganancia Neta (después de combustible) ──
+    // Ganancia absoluta: guarda opcional (0 = desactivado).
     @ColumnInfo(name = "min_net_profit")
-    val minNetProfit: Double = 0.80,         // USD mínimo ganancia neta
+    val minNetProfit: Double = 0.0,          // USD mínimo ganancia neta
 
     @ColumnInfo(name = "min_profit_per_km")
-    val minProfitPerKm: Double = 0.15,       // USD/km neto mínimo
+    val minProfitPerKm: Double = 0.15,       // USD/km neto mínimo (solo si primary = PER_KM)
 
     @ColumnInfo(name = "min_profit_per_hour")
-    val minProfitPerHour: Double = 3.00,     // USD/hr neto mínimo
+    val minProfitPerHour: Double = 3.00,     // USD/hr neto mínimo (solo si primary = PER_HOUR)
 
     // ── Filtros de Distancia ──
     @ColumnInfo(name = "max_pickup_km")

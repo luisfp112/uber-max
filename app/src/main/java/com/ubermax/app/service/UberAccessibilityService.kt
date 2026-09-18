@@ -1,24 +1,28 @@
 package com.ubermax.app.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.content.ContextCompat
 import com.ubermax.app.accessibility.ActionExecutor
 import com.ubermax.app.accessibility.OfferParser
 import com.ubermax.app.data.db.entity.BlacklistZoneEntity
 import com.ubermax.app.data.db.entity.FilterRulesEntity
+import com.ubermax.app.data.db.entity.AppSettingsEntity
 import com.ubermax.app.data.db.entity.TripLogEntity
 import com.ubermax.app.data.db.entity.VehicleConfigEntity
 import com.ubermax.app.data.repository.ConfigRepository
 import com.ubermax.app.data.repository.TripRepository
 import com.ubermax.app.domain.model.Action
-import com.ubermax.app.domain.model.EvaluatedOffer
-import com.ubermax.app.domain.model.OfferData
 import com.ubermax.app.domain.model.OfferDecision
+import com.ubermax.app.domain.model.VoiceCommand
 import com.ubermax.app.domain.rules.RuleEngine
 import com.ubermax.app.domain.usecase.EvaluateOfferUseCase
 import com.ubermax.app.domain.ai.SmartAdvisor
+import com.ubermax.app.util.DecisionNotifier
+import com.ubermax.app.util.VoiceCommandBus
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -51,21 +55,25 @@ class UberAccessibilityService : AccessibilityService() {
     private val ruleEngine = RuleEngine()
     private val evaluator = EvaluateOfferUseCase()
     private lateinit var actionExecutor: ActionExecutor
+    private val notifier by lazy { DecisionNotifier(this) }
 
     // Debounce: evitar procesar la misma oferta múltiples veces
     private var lastProcessedFare = 0.0
     private var lastProcessedTime = 0L
-    private val DEBOUNCE_MS = 3000L // 3 segundos entre procesamiento de ofertas
 
     // Config cacheada
     private var vehicleConfig: VehicleConfigEntity = VehicleConfigEntity()
     private var filterRules: FilterRulesEntity = FilterRulesEntity()
     private var blacklistKeywords: List<String> = emptyList()
     private var blacklistZones: List<BlacklistZoneEntity> = emptyList()
+    private var appSettings: AppSettingsEntity = AppSettingsEntity()
 
     companion object {
         private const val TAG = "UberA11Y"
         private const val UBER_DRIVER_PACKAGE = "com.ubercab.driver"
+
+        // Debounce: 3 segundos entre procesamientos de ofertas
+        private const val DEBOUNCE_MS = 3_000L
 
         // Max reintentos para auto-accept y auto-cancel
         private const val MAX_ACTION_RETRIES = 5
@@ -85,6 +93,7 @@ class UberAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         actionExecutor = ActionExecutor(this)
+        observeVoiceCommands()
         Log.i(TAG, "🟢 UberMax AccessibilityService creado")
     }
 
@@ -104,6 +113,58 @@ class UberAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         Log.w(TAG, "⚠️ Servicio interrumpido")
+    }
+
+    /** Escucha comandos de voz y los traduce a taps sobre la oferta visible. */
+    private fun observeVoiceCommands() {
+        serviceScope.launch {
+            VoiceCommandBus.commands.collect { command ->
+                handleVoiceCommand(command)
+            }
+        }
+    }
+
+    private suspend fun handleVoiceCommand(command: VoiceCommand) {
+        if (!appSettings.voiceControlEnabled) return
+        if (command == VoiceCommand.NEXT) {
+            Log.d(TAG, "🎙️ Voz: esperar")
+            return
+        }
+        val root = findUberWindow() ?: return
+        try {
+            when (command) {
+                VoiceCommand.ACCEPT -> {
+                    Log.i(TAG, "🎙️ Voz: aceptar")
+                    executeWithRetry("VOICE_ACCEPT") { actionExecutor.clickAcceptButton(root) }
+                }
+                VoiceCommand.REJECT -> {
+                    Log.i(TAG, "🎙️ Voz: rechazar")
+                    executeWithRetry("VOICE_REJECT") { actionExecutor.clickDismissButton(root) }
+                }
+                VoiceCommand.NEXT, VoiceCommand.NONE -> Unit
+            }
+        } finally {
+            root.recycle()
+        }
+    }
+
+    /** Arranca o detiene el servicio de voz según el ajuste del conductor. */
+    private fun syncVoiceService(settings: AppSettingsEntity) {
+        val shouldRun = settings.voiceControlEnabled
+        if (shouldRun == VoiceCommandService.isRunning) return
+        try {
+            val intent = Intent(this, VoiceCommandService::class.java).apply {
+                action = if (shouldRun) VoiceCommandService.ACTION_START
+                else VoiceCommandService.ACTION_STOP
+            }
+            if (shouldRun) {
+                ContextCompat.startForegroundService(this, intent)
+            } else {
+                startService(intent)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "No se pudo cambiar el servicio de voz: ${t.message}")
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -176,38 +237,59 @@ class UberAccessibilityService : AccessibilityService() {
 
             // 4.5 IA — Recomendación
             if (filterRules.aiEnabled) {
-                decision = smartAdvisor.analyzeOffer(decision)
+                val referenceProfitPerKm =
+                    if (appSettings.aiGoodProfitPerKm > 0.0) appSettings.aiGoodProfitPerKm
+                    else filterRules.minProfitPerKm
+                decision = smartAdvisor.analyzeOffer(decision, referenceProfitPerKm)
             }
 
-            // 5. Emitir decisión al HUD
-            _decisionFlow.emit(decision)
+            // 4.6 Modo simulación: marca la decisión pero no ejecuta taps
+            val simulated = appSettings.dryRunEnabled
+            val finalDecision = if (simulated) decision.copy(simulated = true) else decision
 
-            // 6. Ejecutar acción
-            when (decision.action) {
-                Action.ACCEPT -> {
-                    Log.i(TAG, "✅ AUTO-ACEPTANDO oferta: \$${offer.rawFare}")
-                    executeWithRetry("ACCEPT") {
-                        actionExecutor.clickAcceptButton(uberRoot)
+            // 5. Emitir decisión al HUD
+            _decisionFlow.emit(finalDecision)
+
+            // 5.5 Feedback inmediato (notificación / vibración / sonido)
+            notifier.feedback(
+                decision = finalDecision,
+                notify = appSettings.notifyDecisions,
+                vibrate = appSettings.vibrateOnDecision,
+                sound = appSettings.soundOnDecision
+            )
+
+            // 6. Ejecutar acción (salvo en modo simulación)
+            if (simulated) {
+                Log.i(TAG, "🧪 SIMULACIÓN — no se ejecuta acción (${decision.action})")
+            } else {
+                when (decision.action) {
+                    Action.ACCEPT -> {
+                        Log.i(TAG, "✅ AUTO-ACEPTANDO oferta: \$${offer.rawFare}")
+                        executeWithRetry("ACCEPT") {
+                            actionExecutor.clickAcceptButton(uberRoot)
+                        }
                     }
-                }
-                Action.CANCEL -> {
-                    Log.i(TAG, "🚫 CANCELANDO oferta (BLACKLIST): ${decision.failedFilters}")
-                    executeWithRetry("CANCEL") {
-                        actionExecutor.clickDismissButton(uberRoot)
+                    Action.CANCEL -> {
+                        Log.i(TAG, "🚫 CANCELANDO oferta (BLACKLIST): ${decision.failedFilters}")
+                        executeWithRetry("CANCEL") {
+                            actionExecutor.clickDismissButton(uberRoot)
+                        }
                     }
-                }
-                Action.WARN -> {
-                    Log.i(TAG, "⚠️ ADVERTENCIA — no recomendable: ${decision.failedFilters}")
-                    // No hacer nada — el conductor ve el aviso en el HUD y decide
-                }
-                Action.IGNORE -> {
-                    Log.d(TAG, "⏳ IGNORANDO — dejando correr temporizador")
+                    Action.WARN -> {
+                        Log.i(TAG, "⚠️ ADVERTENCIA — no recomendable: ${decision.failedFilters}")
+                        // No hacer nada — el conductor ve el aviso en el HUD y decide
+                    }
+                    Action.IGNORE -> {
+                        Log.d(TAG, "⏳ IGNORANDO — dejando correr temporizador")
+                    }
                 }
             }
 
             // 7. Guardar en historial
-            logTrip(offer, evaluated, decision)
+            logTrip(finalDecision)
 
+        } catch (c: CancellationException) {
+            throw c
         } catch (e: Exception) {
             Log.e(TAG, "Error procesando evento: ${e.message}", e)
         } finally {
@@ -224,6 +306,8 @@ class UberAccessibilityService : AccessibilityService() {
         for (attempt in 1..MAX_ACTION_RETRIES) {
             val success = try {
                 action()
+            } catch (c: CancellationException) {
+                throw c
             } catch (e: Exception) {
                 Log.e(TAG, "Error en $actionName intento $attempt: ${e.message}")
                 false
@@ -280,12 +364,19 @@ private fun loadConfig() {
             val fr = configRepository.getFilterRules()
             val keywords = configRepository.getAllMergedBlacklistKeywords()
             val zones = configRepository.getAllBlacklistZones()
+            val settings = configRepository.getAppSettings()
 
             // ...para que un fallo a mitad de camino no mezcle config nueva con vieja.
             vehicleConfig = vc
             filterRules = fr
             blacklistKeywords = keywords
             blacklistZones = zones
+            appSettings = settings
+
+            // Sincronizar servicio de voz con el ajuste actual
+            syncVoiceService(settings)
+        } catch (c: CancellationException) {
+            throw c
         } catch (e: Exception) {
             // Cache fallback: las variables de clase conservan la ÚLTIMA configuración
             // válida (o los valores por defecto si nunca se cargó), así el pipeline
@@ -295,10 +386,12 @@ private fun loadConfig() {
     }
 }
 
-    private suspend fun logTrip(offer: OfferData, evaluated: EvaluatedOffer, decision: OfferDecision) {
+    private suspend fun logTrip(decision: OfferDecision) {
         withContext(Dispatchers.IO) {
             try {
                 tripRepository.logDecision(decision)
+            } catch (c: CancellationException) {
+                throw c
             } catch (e: Exception) {
                 Log.e(TAG, "Error guardando trip: ${e.message}")
             }

@@ -32,7 +32,6 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.TilesOverlay
 import java.util.HashMap
 
 /**
@@ -43,7 +42,7 @@ import java.util.HashMap
  *  - Dibujar polígonos tocando el mapa
  *  - Zonas persistidas en Room, dibujadas con fill + marker en el centroide
  *  - La ubicación del usuario se obtiene de FusedLocationProvider (gratis, sin clave)
- *  - Tema oscuro mediante filtro de color sobre los tiles (TilesOverlay.setColorFilter)
+ *  - Tema claro con los tiles estándar de OpenStreetMap (MAPNIK)
  */
 @AndroidEntryPoint
 class BlacklistMapActivity : AppCompatActivity() {
@@ -113,10 +112,7 @@ class BlacklistMapActivity : AppCompatActivity() {
         mapView.setMultiTouchControls(true)
         mapView.setMinZoomLevel(4.0)
         mapView.setMaxZoomLevel(19.0)
-        mapView.setBackgroundColor(Color.parseColor("#1a1a1a"))
-
-        // Tema oscuro: filtro de inversión de colores sobre los tiles de OSM (night mode)
-        mapView.overlayManager.tilesOverlay.setColorFilter(TilesOverlay.INVERT_COLORS)
+        mapView.setBackgroundColor(Color.WHITE)
 
         // Captura de toques para construir polígonos
         tapOverlay = MapEventsOverlay(object : MapEventsReceiver {

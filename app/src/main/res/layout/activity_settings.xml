@@ -158,7 +158,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="💵 Filtros de Tarifa (USD)"
+            android:text="💵 Tarifa bruta (guarda opcional)"
             android:textColor="@color/secondary"
             android:textSize="16sp"
             android:textStyle="bold"
@@ -167,7 +167,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Tarifa mínima ($)"
+            android:hint="Tarifa mínima ($, 0 = desactivado)"
             android:layout_marginBottom="16dp"
             android:textColorHint="@color/text_tertiary">
             <com.google.android.material.textfield.TextInputEditText
@@ -280,39 +280,52 @@
                 android:inputType="numberDecimal" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- ═══ FILTROS DE GANANCIA NETA ═══ -->
+        <!-- ═══ FILTROS DE RENTABILIDAD ═══ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="💰 Ganancia Neta (después combustible)"
+            android:text="💰 Rentabilidad (después de combustible)"
             android:textColor="@color/profit_positive"
             android:textSize="16sp"
             android:textStyle="bold"
             android:layout_marginBottom="8dp" />
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/til_min_net_profit"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Ganancia neta mínima ($)"
-            android:layout_marginBottom="6dp"
-            android:textColorHint="@color/text_tertiary"
-            app:endIconMode="custom"
-            app:endIconDrawable="@android:drawable/ic_menu_info_details"
-            app:endIconTint="@color/info">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_min_net_profit"
-                android:layout_width="match_parent"
+            android:text="Solo la métrica principal decide si un viaje es rentable; la otra se ignora."
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:layout_marginBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/rg_primary_metric"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <RadioButton
+                android:id="@+id/rb_primary_hour"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text_primary"
-                android:inputType="numberDecimal" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:text="Por hora"
+                android:textColor="@color/text_primary" />
+
+            <RadioButton
+                android:id="@+id/rb_primary_km"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="Por km"
+                android:textColor="@color/text_primary" />
+        </RadioGroup>
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/til_min_profit_per_km"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Mín ganancia neta $/km"
+            android:hint="Mín ganancia neta $/km (modo por km)"
             android:layout_marginBottom="6dp"
             android:textColorHint="@color/text_tertiary"
             app:endIconMode="custom"
@@ -329,11 +342,40 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Mín ganancia neta $/hora"
-            android:layout_marginBottom="16dp"
-            android:textColorHint="@color/text_tertiary">
+            android:hint="Mín ganancia neta $/hora (modo por hora)"
+            android:layout_marginBottom="10dp"
+            android:textColorHint="@color/text_tertiary"
+            app:endIconMode="custom"
+            app:endIconDrawable="@android:drawable/ic_menu_info_details"
+            app:endIconTint="@color/info">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_min_profit_per_hour"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Guardas opcionales (0 = desactivado): solo filtran casos absolutos."
+            android:textColor="@color/text_tertiary"
+            android:textSize="12sp"
+            android:layout_marginBottom="6dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_min_net_profit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Ganancia neta mínima total ($, opcional)"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary"
+            app:endIconMode="custom"
+            app:endIconDrawable="@android:drawable/ic_menu_info_details"
+            app:endIconTint="@color/info">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_min_net_profit"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_primary"
@@ -364,6 +406,116 @@
             android:text="SmartAdvisor IA (Recomendaciones)"
             android:textColor="@color/text_primary"
             android:layout_marginBottom="16dp" />
+
+        <!-- ═══ COMPORTAMIENTO ═══ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_behavior_title"
+            android:textColor="@color/primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_dry_run"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_dry_run"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_auto_start_boot"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_auto_start_boot"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_notify"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_notify_decisions"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_vibrate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_vibrate"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_sound"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_sound"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_voice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_voice_control"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_auto_start_bt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_auto_start_bt"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/settings_ai_good_profit_per_km"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_ai_good_profit_per_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_open_onboarding"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="@string/onboarding_title"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/bg_tertiary"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_export_config"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="@string/export_config"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/bg_tertiary"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_import_config"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="@string/import_config"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/bg_tertiary"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp" />
 
         <!-- ═══ LISTA NEGRA ═══ -->
         <TextView

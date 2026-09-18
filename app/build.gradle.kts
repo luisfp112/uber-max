@@ -15,6 +15,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+        // Versionado: versionCode único por release y versionName en SemVer (X.Y.Z).
+        // Cada release va etiquetado en git como v<versionName> (ver README -> Versionado).
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -49,6 +51,17 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    // Artefacto versionado: UberMax-<versionName>-<buildType>.apk
+    // La versión se incrementa con cada release (ver README -> Versionado).
+    applicationVariants.all {
+        val appVersion = versionName
+        val buildTypeName = buildType.name
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "UberMax-${appVersion}-${buildTypeName}.apk"
+        }
+    }
 }
 
 dependencies {
@@ -57,6 +70,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.google.material)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.recyclerview)
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)

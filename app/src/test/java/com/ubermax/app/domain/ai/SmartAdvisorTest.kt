@@ -202,7 +202,8 @@ class SmartAdvisorTest {
 
         val result = SmartAdvisor(history).analyzeOffer(acceptedDecision())
 
-        assertTrue(result.aiRecommendation.contains("dato"))
+        // Error tipado: se distingue "sin datos" de "no disponible".
+        assertTrue(result.aiRecommendation.contains("historial"))
         assertEquals(0.1, result.aiConfidence, 0.001)
     }
 }

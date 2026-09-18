@@ -88,6 +88,8 @@ class NominatimGeocoder @Inject constructor() {
                     val json = JSONObject(body)
                     parseNominatimResponse(json)
                 }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
             } catch (e: Exception) {
                 Logs.e(TAG, "Reverse geocode error: ${e.message}")
                 null

@@ -307,7 +307,7 @@ class OfferParserTest {
         )
         val offer = parser.parseFromTextNodes(nodes)!!
         val decision = ruleEngine.evaluate(
-            evaluator.evaluate(offer, vehicle), FilterRulesEntity(), emptyList(), emptyList()
+            evaluator.evaluate(offer, vehicle), FilterRulesEntity(minFare = 1.50), emptyList(), emptyList()
         )
 
         assertEquals(Action.WARN, decision.action)

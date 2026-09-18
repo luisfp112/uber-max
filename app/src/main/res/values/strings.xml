@@ -102,4 +102,79 @@
     <string name="best_zones_empty">Aún sin historial para analizar mejores zonas</string>
     <string name="hour_stat_line">%1$d:00 — $%2$.2f (%3$d viajes)</string>
     <string name="zone_stat_line">%1$s — $%2$.2f/km (%3$d viajes)</string>
+
+    <!-- Onboarding de permisos -->
+    <string name="onboarding_title">Configuración inicial</string>
+    <string name="onboarding_subtitle">UberMax necesita estos permisos para automatizar ofertas. Concede los obligatorios para empezar.</string>
+    <string name="onboarding_continue">Continuar al panel</string>
+    <string name="permission_granted">Concedido</string>
+    <string name="permission_denied">Pendiente</string>
+    <string name="permission_required_label">Obligatorio</string>
+    <string name="permission_optional_label">Opcional</string>
+    <string name="permission_action_grant">Conceder</string>
+    <string name="permission_action_open">Abrir ajustes</string>
+    <string name="perm_accessibility_name">Servicio de Accesibilidad</string>
+    <string name="perm_accessibility_reason">Lee la pantalla de Uber Driver para detectar ofertas.</string>
+    <string name="perm_notifications_name">Notificaciones</string>
+    <string name="perm_notifications_reason">Avisa decisiones y mantiene el monitoreo activo.</string>
+    <string name="perm_battery_name">Sin restricción de batería</string>
+    <string name="perm_battery_reason">Evita que el sistema detenga el monitoreo.</string>
+    <string name="perm_overlay_name">Superponer sobre otras apps</string>
+    <string name="perm_overlay_reason">Muestra el HUD flotante con la decisión.</string>
+    <string name="perm_location_name">Ubicación</string>
+    <string name="perm_location_reason">Centra el mapa de zonas y mejora el análisis.</string>
+    <string name="perm_microphone_name">Micrófono</string>
+    <string name="perm_microphone_reason">Habilita los comandos de voz.</string>
+    <string name="perm_bluetooth_name">Bluetooth</string>
+    <string name="perm_bluetooth_reason">Auto-arranque al conectar el auto.</string>
+    <string name="onboarding_ready">Todo listo para operar</string>
+    <string name="onboarding_missing_required">Faltan permisos obligatorios</string>
+    <string name="onboarding_done">Permisos obligatorios concedidos</string>
+
+    <!-- Ajustes: comportamiento -->
+    <string name="settings_behavior_title">Comportamiento</string>
+    <string name="settings_dry_run">Modo simulación</string>
+    <string name="settings_dry_run_summary">Evalúa y muestra el HUD, pero no pulsa en Uber.</string>
+    <string name="settings_auto_start_boot">Auto-arranque al reiniciar</string>
+    <string name="settings_auto_start_boot_summary">Inicia el monitoreo tras encender el dispositivo.</string>
+    <string name="settings_notify_decisions">Notificar decisiones</string>
+    <string name="settings_notify_decisions_summary">Muestra una notificación por cada oferta evaluada.</string>
+    <string name="settings_vibrate">Vibrar al decidir</string>
+    <string name="settings_sound">Sonido al decidir</string>
+    <string name="settings_voice_control">Control por voz</string>
+    <string name="settings_voice_control_summary">Di "aceptar" o "rechazar" durante el monitoreo.</string>
+    <string name="settings_auto_start_bt">Auto-arranque por Bluetooth</string>
+    <string name="settings_auto_start_bt_summary">Inicia al conectar un dispositivo de audio del auto.</string>
+    <string name="settings_ai_good_profit_per_km">Buena ganancia por km (USD)</string>
+    <string name="settings_ai_good_profit_per_km_summary">Referencia que usa la IA para puntuar destinos.</string>
+    <string name="export_config">Exportar configuración</string>
+    <string name="import_config">Importar configuración</string>
+    <string name="config_exported">Configuración exportada</string>
+    <string name="config_imported">Configuración importada</string>
+    <string name="config_import_error">No se pudo importar la configuración</string>
+    <string name="voice_notification_title">Control por voz activo</string>
+    <string name="voice_notification_text">Di "aceptar" o "rechazar" para actuar sobre la oferta</string>
+
+    <!-- HUD simulación -->
+    <string name="hud_simulation">SIMULACIÓN</string>
+
+    <!-- Canal de notificaciones de decisión -->
+    <string name="decision_channel_name">Decisiones de UberMax</string>
+    <string name="decision_channel_description">Avisos inmediatos de cada oferta evaluada</string>
+    <string name="decision_notification_accepted">Oferta aceptada</string>
+    <string name="decision_notification_rejected">Oferta rechazada</string>
+    <string name="decision_notification_simulated">Simulación</string>
+
+    <!-- Historial -->
+    <string name="open_history">Historial</string>
+    <string name="history_title">Historial de ofertas</string>
+    <string name="history_empty">Aún no hay ofertas registradas</string>
+    <string name="history_chart_title">Ganancia por hora</string>
+    <string name="history_chart_empty">Sin datos para graficar</string>
+    <string name="history_filter_today">Hoy</string>
+    <string name="history_filter_7d">7 días</string>
+    <string name="history_filter_30d">30 días</string>
+    <string name="history_filter_all">Todo</string>
+    <string name="history_price_format">$%1$.2f</string>
+    <string name="history_date_format">%1$s · %2$s</string>
 </resources>
