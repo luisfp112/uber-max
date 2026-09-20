@@ -44,19 +44,24 @@ class ActionExecutor(
     companion object {
         private const val TAG = "ActionExecutor"
 
+        // Límite de profundidad del árbol: acota el recorrido DFS para evitar
+        // costes altos en ventanas muy anidadas (el botón está siempre cerca).
+        private const val MAX_DEPTH = 60
+
         // ── Frases de aceptación ──
         // Cubre ofertas asignadas (aceptar, confirmar) y ofertas abiertas
-        // (viaje disponible, postularse, solicitar...). Todas se comparan
-        // con TextNormalizer para ignorar mayúsculas, tildes y símbolos.
+        // (viaje disponible, me interesa, postularse, solicitar...). Todas se
+        // comparan con TextNormalizer para ignorar mayúsculas, tildes y símbolos.
         private val ACCEPT_PHRASES = listOf(
             // Ofertas asignadas a este conductor
             "aceptar", "aceptar viaje", "confirmar", "accept",
-            // Ofertas abiertas (se compiten por ellas)
-            "viaje disponible", "disponible", "postularse", "postularte",
+            // Ofertas abiertas (se compiten por ellas). Uber A/B: la tarjeta
+            // puede mostrar "Viaje disponible" o "Me interesa" indistintamente.
+            "viaje disponible", "disponible", "me interesa", "postularse", "postularte",
             "postularme", "postular", "aplicar", "apuntarse", "apuntarme",
             "solicitar", "solicitar viaje", "solicita", "solicito", "participar",
             // Inglés
-            "trip available", "request", "request trip", "join", "apply"
+            "trip available", "i'm interested", "request", "request trip", "join", "apply"
         )
 
         // ── Textos del botón CANCELAR / RECHAZAR (X superior) ──
@@ -216,6 +221,7 @@ class ActionExecutor(
         val candidates = mutableListOf<Candidate>()
 
         fun walk(node: AccessibilityNodeInfo, depth: Int) {
+            if (depth > MAX_DEPTH) return
             val text: String
             val desc: String
             try {

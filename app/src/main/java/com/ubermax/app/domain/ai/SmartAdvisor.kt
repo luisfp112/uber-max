@@ -5,7 +5,6 @@ import com.ubermax.app.domain.model.HistoryResult
 import com.ubermax.app.domain.model.OfferDecision
 import com.ubermax.app.domain.port.TripHistorySource
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.firstOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -86,9 +85,18 @@ class SmartAdvisor @Inject constructor(
         )
     }
 
-    /** Lee el historial con manejo tipado de errores (no silencioso). */
+    /**
+     * Lee el historial con manejo tipado de errores (no silencioso).
+     *
+     * Usa un historial acotado (recientes) y filtra los viajes sin resultado
+     * consolidado: solo se enseña IA con viajes donde ya se sabe qué pasó
+     * (resolution definida) o que fueron aceptados/rechazados por reglas. Un
+     * WARN ignorado a tiempo no cuenta como "destino bueno ni malo".
+     */
     private suspend fun loadHistory(): HistoryResult = try {
-        HistoryResult.Success(tripHistory.getAllTripsFlow().firstOrNull() ?: emptyList())
+        val recent = tripHistory.getRecentTrips(MAX_HISTORY_TRIPS)
+            .filter { it.resolution != "UNKNOWN" || it.decision == "ACCEPT" || it.decision == "CANCEL" }
+        HistoryResult.Success(recent)
     } catch (c: CancellationException) {
         throw c
     } catch (e: Exception) {
@@ -138,5 +146,8 @@ class SmartAdvisor @Inject constructor(
     companion object {
         /** Referencia histórica por defecto (Ambato): $0.25/km. */
         const val DEFAULT_GOOD_PROFIT_PER_KM = 0.25
+
+        /** Máximo de viajes recientes que se consideran para la IA. */
+        const val MAX_HISTORY_TRIPS = 500
     }
 }

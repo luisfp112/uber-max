@@ -17,7 +17,10 @@ object CsvExporter {
             "timestamp", "dia", "hora", "tarifa_bruta", "pickup_km", "trip_km",
             "minutos", "rating", "destino", "pickup", "costo_combustible",
             "ganancia_neta", "ganancia_km", "ganancia_hora", "km_total",
-            "decision", "filtros_fallidos"
+            "decision", "filtros_fallidos", "tiene_rating", "tipo_viaje",
+            "viajes_pasajero", "minutos_estimados", "accion_aplicada", "resolucion",
+            "recomendacion_ia", "confianza_ia", "pickup_lat", "pickup_lng",
+            "dest_lat", "dest_lng"
         ).joinToString(",")
 
         val rows = trips.map { t ->
@@ -38,12 +41,26 @@ object CsvExporter {
                 formatNum(t.profitPerHour),
                 formatNum(t.totalKm),
                 t.decision,
-                escape(t.failedFilters)
+                escape(t.failedFilters),
+                t.hasRating.toString(),
+                escape(t.rideType),
+                t.passengerTrips.toString(),
+                t.minutesEstimated.toString(),
+                t.actionApplied.toString(),
+                escape(t.resolution),
+                t.aiRecommendation.toString(),
+                formatNum(t.aiConfidence),
+                formatNullableNum(t.pickupLat),
+                formatNullableNum(t.pickupLng),
+                formatNullableNum(t.destLat),
+                formatNullableNum(t.destLng)
             ).joinToString(",")
         }
 
         return (listOf(header) + rows).joinToString("\n")
     }
+
+    fun formatNullableNum(value: Double?): String = value?.let(::formatNum) ?: ""
 
     fun formatTimestamp(millis: Long): String =
         SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(millis))

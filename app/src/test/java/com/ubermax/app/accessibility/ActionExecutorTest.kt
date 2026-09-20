@@ -12,7 +12,7 @@ import org.junit.Test
  * Tests JVM puros para ActionExecutor y TapGeometry.
  *
  * Valida que el reconocimiento de botones cubra ofertas asignadas y abiertas
- * ("Aceptar", "Viaje disponible", "Postularse") y que TODA la geometría de toque
+ * ("Aceptar", "Viaje disponible", "Me interesa", "Postularse") y que TODA la geometría de toque
  * sea RELATIVA (proporciones de pantalla o región de la tarjeta), sin ninguna
  * coordenada absoluta fija a un modelo de teléfono.
  */
@@ -37,6 +37,14 @@ class ActionExecutorTest {
     }
 
     @Test
+    fun `reconoce boton Me interesa de oferta abierta`() {
+        assertTrue(ActionExecutor.matchesAcceptText("Me interesa"))
+        assertTrue(ActionExecutor.matchesAcceptText("ME INTERESA"))
+        assertTrue(ActionExecutor.matchesAcceptText("¡Me interesa!"))
+        assertTrue(ActionExecutor.matchesAcceptText("I'm interested"))
+    }
+
+    @Test
     fun `reconoce boton Postularse de oferta abierta`() {
         assertTrue(ActionExecutor.matchesAcceptText("Postularse"))
         assertTrue(ActionExecutor.matchesAcceptText("Postularte"))
@@ -58,6 +66,13 @@ class ActionExecutorTest {
         assertTrue(ActionExecutor.matchesAcceptText("Request trip"))
         assertTrue(ActionExecutor.matchesAcceptText("Request"))
         assertTrue(ActionExecutor.matchesAcceptText("Join"))
+    }
+
+    @Test
+    fun `no confunde palabras derivadas con Me interesa`() {
+        assertFalse(ActionExecutor.matchesAcceptText("Interesante"))
+        assertFalse(ActionExecutor.matchesAcceptText("Desinteresado"))
+        assertFalse(ActionExecutor.matchesAcceptText("Rechazar"))
     }
 
     @Test

@@ -102,7 +102,15 @@ class RuleEngine {
         }
 
         // ── Rating mínimo del pasajero ──
-        if (rules.minPassengerRating > 0 && evaluated.offer.passengerRating < rules.minPassengerRating) {
+        // Si la oferta no muestra rating (hasRating = false) depende del toggle:
+        // rejectOnUnknownRating = false → se ignora el filtro y la oferta no se
+        // penaliza por un dato que el parser no pudo leer (evita rechazos en falso
+        // por "rating 0.00"); true → se rechaza explícitamente.
+        if (rules.minPassengerRating > 0 && !evaluated.offer.hasRating && rules.rejectOnUnknownRating) {
+            failedFilters.add("⭐ Rating desconocido — rechazar por configuración")
+        } else if (rules.minPassengerRating > 0 &&
+            evaluated.offer.hasRating &&
+            evaluated.offer.passengerRating < rules.minPassengerRating) {
             failedFilters.add("⭐ Rating bajo: ${f(evaluated.offer.passengerRating)} < mín ${f(rules.minPassengerRating)}")
         }
 

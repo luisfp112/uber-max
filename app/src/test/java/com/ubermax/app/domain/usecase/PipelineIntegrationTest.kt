@@ -11,6 +11,7 @@ import com.ubermax.app.domain.model.OfferData
 import com.ubermax.app.domain.port.TripHistorySource
 import com.ubermax.app.domain.rules.RuleEngine
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -33,6 +34,8 @@ class PipelineIntegrationTest {
         TripHistorySource {
         override fun getAllTripsFlow(): Flow<List<TripLogEntity>> =
             error?.let { flow<List<TripLogEntity>> { throw it } } ?: results ?: flowOf(emptyList())
+        override suspend fun getRecentTrips(limit: Int): List<TripLogEntity> =
+            error?.let { throw it } ?: results?.firstOrNull() ?: emptyList()
     }
 
     private val evaluator = EvaluateOfferUseCase()

@@ -27,7 +27,10 @@ class RuleEngineTest {
 
     private val evaluator = EvaluateOfferUseCase()
     private val ruleEngine = RuleEngine()
-    private val vehicle = VehicleConfigEntity(manualCostPerKm = 0.08) // costPerKm manual = $0.08 USD
+    private val vehicle = VehicleConfigEntity(
+        manualCostPerKm = 0.08, // costPerKm manual = $0.08 USD
+        platformCommissionPercent = 0.0 // comisión: 0 para validar deadhead con cuentas exactas
+    )
 
     /** Construye una oferta rentable a 10 USD con viaje corto (sin deadhead). */
     private fun evaluatedOffer(
@@ -38,8 +41,11 @@ class RuleEngineTest {
         tripMinutes: Int = 20,
         estimatedMinutes: Int = 23,
         rating: Double = 4.8,
+        hasRating: Boolean = true,
         destination: String = "Centro Histórico, AMBATO",
-        pickupAddress: String = "Av. Cevallos, Terminal"
+        pickupAddress: String = "Av. Cevallos, Terminal",
+        deadheadReturnFactor: Double = 0.0,
+        deadheadThresholdKm: Double = 8.0
     ): EvaluatedOffer = evaluator.evaluate(
         OfferData(
             rawFare = fare,
@@ -49,10 +55,13 @@ class RuleEngineTest {
             tripMinutes = tripMinutes,
             estimatedMinutes = estimatedMinutes,
             passengerRating = rating,
+            hasRating = hasRating,
             destination = destination,
             pickupAddress = pickupAddress
         ),
-        vehicle
+        vehicle,
+        deadheadThresholdKm = deadheadThresholdKm,
+        deadheadReturnFactor = deadheadReturnFactor
     )
 
     // ═══════════════════════════════════════════════════════
@@ -91,6 +100,28 @@ class RuleEngineTest {
     }
 
     @Test
+    fun `rating desconocido sin toggle no marca fallido por un dato que no se pudo leer`() {
+        val decision = ruleEngine.evaluate(
+            evaluatedOffer(rating = 0.0, hasRating = false),
+            FilterRulesEntity(minPassengerRating = 4.5)
+        )
+
+        assertEquals(Action.ACCEPT, decision.action)
+        assertFalse(decision.failedFilters.any { it.contains("Rating") })
+    }
+
+    @Test
+    fun `rating desconocido con toggle activado genera WARN explicito`() {
+        val decision = ruleEngine.evaluate(
+            evaluatedOffer(rating = 0.0, hasRating = false),
+            FilterRulesEntity(minPassengerRating = 4.5, rejectOnUnknownRating = true)
+        )
+
+        assertEquals(Action.WARN, decision.action)
+        assertTrue(decision.failedFilters.any { it.contains("Rating desconocido") })
+    }
+
+    @Test
     fun `con auto-aceptar desactivado una oferta buena pasa a WARN informativo`() {
         val decision = ruleEngine.evaluate(
             evaluatedOffer(),
@@ -107,13 +138,16 @@ class RuleEngineTest {
 
     @Test
     fun `viaje largo mayor a 8km pero rentable NO se marca fallido por deadhead`() {
+        // factor 1.0 → vuelta vacía con rampa: 12km * ((12-8)/8) = 6km de retorno.
+        // Falta neta $8.48, $0.45/km → sigue rentable.
         val evaluated = evaluatedOffer(
-            fare = 10.00,   // neto $8.0, $0.32/km, $7.62/h con retorno
+            fare = 10.00,
             pickupKm = 1.0,
             tripKm = 12.0,
             pickupMinutes = 3,
             tripMinutes = 30,
-            estimatedMinutes = 33
+            estimatedMinutes = 33,
+            deadheadReturnFactor = 1.0
         )
         assertTrue(evaluated.hasDeadheadPenalty) // trip > 8km
 
@@ -131,27 +165,29 @@ class RuleEngineTest {
             tripKm = 12.0,
             pickupMinutes = 3,
             tripMinutes = 30,
-            estimatedMinutes = 33
+            estimatedMinutes = 33,
+            deadheadReturnFactor = 1.0
         )
 
-        assertEquals(12.0, evaluated.returnKm, 0.001)
-        assertEquals(25.0, evaluated.totalKm, 0.001) // 1 + 12 + 12 retorno
-        assertEquals(8.0, evaluated.netProfit, 0.001) // 10 - (25 × 0.08)
+        assertEquals(6.0, evaluated.returnKm, 0.001)
+        assertEquals(19.0, evaluated.totalKm, 0.001) // 1 + 12 + 6 retorno
+        assertEquals(8.48, evaluated.netProfit, 0.001) // 10 - (19 × 0.08)
         assertTrue(evaluated.netProfit > FilterRulesEntity().minNetProfit)
         assertTrue(evaluated.profitPerKm > FilterRulesEntity().minProfitPerKm)
     }
 
     @Test
     fun `viaje largo cuyo deadhead hunde la rentabilidad final genera WARN con vuelta vacia`() {
-        // Sin deadhead: neto $2.0, $0.20/km, $5.2/h → ACCEPT.
-        // Con deadhead (9km de retorno): neto $1.28, $0.067/km, $1.79/h → bajo mínimos.
+        // Sin deadhead: neto $2.56, $0.16/km → bordea el mínimo.
+        // Con deadhead (13.1km de retorno): neto $0.67, $0.023/km → bajo mínimos.
         val evaluated = evaluatedOffer(
-            fare = 2.80,
+            fare = 3.00,
             pickupKm = 1.0,
-            tripKm = 9.0,
+            tripKm = 15.0,
             pickupMinutes = 3,
             tripMinutes = 20,
-            estimatedMinutes = 23
+            estimatedMinutes = 23,
+            deadheadReturnFactor = 1.0
         )
         assertTrue(evaluated.hasDeadheadPenalty)
         assertTrue(evaluated.netProfit > FilterRulesEntity().minNetProfit)
@@ -172,7 +208,8 @@ class RuleEngineTest {
             tripKm = 20.0,
             pickupMinutes = 3,
             tripMinutes = 40,
-            estimatedMinutes = 43
+            estimatedMinutes = 43,
+            deadheadReturnFactor = 1.0
         )
         assertTrue(evaluated.hasDeadheadPenalty)
         assertTrue(evaluated.netProfit < 0.0) // 3.00 - (41 × 0.08) = -0.28
@@ -198,7 +235,8 @@ class RuleEngineTest {
             tripKm = 20.0,
             pickupMinutes = 3,
             tripMinutes = 40,
-            estimatedMinutes = 43
+            estimatedMinutes = 43,
+            deadheadReturnFactor = 1.0
         )
         assertTrue(evaluated.hasDeadheadPenalty)
 

@@ -14,6 +14,12 @@ interface TripLogDao {
     fun getAllTripsFlow(): Flow<List<TripLogEntity>>
 
     @Query("SELECT * FROM trip_log ORDER BY timestamp DESC LIMIT :limit")
+    fun getRecentTripsFlow(limit: Int): Flow<List<TripLogEntity>>
+
+    @Query("UPDATE trip_log SET resolution = :resolution WHERE id = :id")
+    suspend fun updateResolution(id: Long, resolution: String)
+
+    @Query("SELECT * FROM trip_log ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getRecentTrips(limit: Int = 50): List<TripLogEntity>
 
     @Query("SELECT * FROM trip_log WHERE timestamp >= :startOfDay AND timestamp < :endOfDay ORDER BY timestamp DESC")

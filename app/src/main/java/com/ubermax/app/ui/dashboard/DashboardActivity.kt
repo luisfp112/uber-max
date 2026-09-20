@@ -23,6 +23,7 @@ import com.ubermax.app.ui.settings.SettingsActivity
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -153,6 +154,13 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         updateStatus()
+        // Los companion flags (isRunning) se setean en onCreate del servicio, que corre
+        // un instante después del startService; refrescar con una pequeña espera evita
+        // mostrar "Detenido" en falso justo tras arrancar.
+        lifecycleScope.launch {
+            delay(700)
+            updateStatus()
+        }
     }
 
     private fun stopMonitoring() {
@@ -163,6 +171,10 @@ class DashboardActivity : AppCompatActivity() {
             action = FloatingWindowService.ACTION_HIDE
         })
         updateStatus()
+        lifecycleScope.launch {
+            delay(700)
+            updateStatus()
+        }
     }
 
     private fun updateStatus() {

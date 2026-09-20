@@ -22,9 +22,9 @@ sealed interface HudReason {
 }
 
 /**
- * Lógica de presentación pura del HUD: qué motivo mostrar y cómo abreviar el
- * destino. Extraída de [com.ubermax.app.service.FloatingWindowService] para
- * poder validarla sin dispositivo.
+ * Lógica de presentación pura del HUD y del historial: qué motivo mostrar y cómo
+ * abreviar el destino. Extraída de [com.ubermax.app.service.FloatingWindowService]
+ * y [com.ubermax.app.ui.history.TripLogAdapter] para poder validarla sin dispositivo.
  */
 object HudReasonFormatter {
 
@@ -59,5 +59,12 @@ object HudReasonFormatter {
         if (first.length <= maxLength) return first
         val cut = (maxLength - 1).coerceAtLeast(1)
         return first.take(cut).trimEnd() + "…"
+    }
+
+    /** Resumen IA para el HUD, o una cadena vacía si no hay recomendación. */
+    fun aiSummary(decision: OfferDecision): String {
+        val rec = decision.aiRecommendation.takeIf { it.isNotBlank() } ?: return ""
+        return if (decision.aiConfidence > 0.0) "💡 $rec (${(decision.aiConfidence * 100).toInt()}%)"
+        else "💡 $rec"
     }
 }

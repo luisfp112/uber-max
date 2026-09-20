@@ -78,5 +78,53 @@ data class TripLogEntity(
     val decision: String, // Action.name — "ACCEPT" | "WARN" | "CANCEL" | "IGNORE"
 
     @ColumnInfo(name = "failed_filters")
-    val failedFilters: String = "" // Comma-separated list of failed filter names
+    val failedFilters: String = "", // Comma-separated list of failed filter names
+
+    // ── Datos enriquecidos (v10) ──
+    /** False si el parser no pudo leer el rating del pasajero. */
+    @ColumnInfo(name = "has_rating")
+    val hasRating: Boolean = true,
+
+    @ColumnInfo(name = "ride_type")
+    val rideType: String = "",
+
+    @ColumnInfo(name = "passenger_trips")
+    val passengerTrips: Int = 0,
+
+    /** True si el estimado de minutos se calculó por fallback (velocidad promedio). */
+    @ColumnInfo(name = "minutes_estimated")
+    val minutesEstimated: Boolean = false,
+
+    /** True si la acción recomendada se ejecutó y se verificó en pantalla. */
+    @ColumnInfo(name = "action_applied")
+    val actionApplied: Boolean = false,
+
+    /**
+     * Resultado real de la oferta:
+     * - ASSIGNED    → el ACCEPT se aplicó (o el conductor aceptó manualmente) y se vio la pantalla de viaje
+     * - TIMEOUT     → nadie actuó y llegó otra oferta (WARN/IGNORE expiró)
+     * - MANUAL_ACCEPT / MANUAL_REJECT → el conductor overrideó por voz
+     * - TAP_FAILED  → la acción automática no se pudo ejecutar/verificar
+     * - UNKNOWN     → aún sin resolver
+     */
+    @ColumnInfo(name = "resolution")
+    val resolution: String = "UNKNOWN",
+
+    @ColumnInfo(name = "ai_recommendation")
+    val aiRecommendation: String = "",
+
+    @ColumnInfo(name = "ai_confidence")
+    val aiConfidence: Double = 0.0,
+
+    @ColumnInfo(name = "pickup_lat")
+    val pickupLat: Double? = null,
+
+    @ColumnInfo(name = "pickup_lng")
+    val pickupLng: Double? = null,
+
+    @ColumnInfo(name = "dest_lat")
+    val destLat: Double? = null,
+
+    @ColumnInfo(name = "dest_lng")
+    val destLng: Double? = null
 )

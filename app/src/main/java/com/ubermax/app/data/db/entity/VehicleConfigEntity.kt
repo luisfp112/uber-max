@@ -51,6 +51,14 @@ data class VehicleConfigEntity(
     @ColumnInfo(name = "engine_idle_cost_per_hour")
     val engineIdleCostPerHour: Double = 0.20,
 
+    /**
+     * Comisión que retiene la plataforma (%). Se descuenta de la tarifa bruta
+     * antes de calcular la ganancia neta. 0 = sin comisión.
+     * Valor real de la plataforma: 9%.
+     */
+    @ColumnInfo(name = "platform_commission_percent")
+    val platformCommissionPercent: Double = 9.0,
+
     // ── Costo por km manual (0 = usar cálculo automático) ──
 
     /** Si es mayor a 0, reemplaza el costo calculado automáticamente. */

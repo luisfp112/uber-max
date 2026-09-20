@@ -99,6 +99,7 @@ class SettingsActivity : AppCompatActivity() {
                     b.etMaintenancePerKm.setText(s.maintenancePerKm.toString())
                     b.etManualCostPerKm.setText(s.manualCostPerKm.toString())
                     b.etAvgSpeed.setText(s.avgSpeed.toString())
+                    b.etPlatformCommission.setText(s.platformCommissionPercent.toString())
                     // Fare filters
                     b.etMinFare.setText(s.minFare.toString())
                     // Métrica principal de rentabilidad
@@ -113,6 +114,7 @@ class SettingsActivity : AppCompatActivity() {
                     b.etMaxTotalMinutes.setText(s.maxTotalMinutes.toString())
                     // Rating
                     b.etMinPassengerRating.setText(s.minPassengerRating.toString())
+                    b.switchRejectUnknownRating.isChecked = s.rejectOnUnknownRating
                     // Net profit
                     b.etMinNetProfit.setText(s.minNetProfit.toString())
                     b.etMinProfitPerKm.setText(s.minProfitPerKm.toString())
@@ -123,6 +125,7 @@ class SettingsActivity : AppCompatActivity() {
                     b.switchAi.isChecked = s.aiEnabled
                     // Deadhead
                     b.etDeadheadThresholdKm.setText(s.deadheadThresholdKm.toString())
+                    b.etDeadheadReturnFactor.setText(s.deadheadReturnFactor.toString())
                     // Comportamiento
                     b.switchDryRun.isChecked = s.dryRunEnabled
                     b.switchAutoStartBoot.isChecked = s.autoStartOnBoot
@@ -181,6 +184,7 @@ class SettingsActivity : AppCompatActivity() {
             "Mantenimiento/km" to b.etMaintenancePerKm,
             "Costo manual/km" to b.etManualCostPerKm,
             "Velocidad promedio" to b.etAvgSpeed,
+            "Comisión plataforma (%)" to b.etPlatformCommission,
             "Tarifa mínima" to b.etMinFare,
             "Ganancia neta mínima" to b.etMinNetProfit,
             "Ganancia/km mínima" to b.etMinProfitPerKm,
@@ -189,6 +193,7 @@ class SettingsActivity : AppCompatActivity() {
             "Viaje máx" to b.etMaxTripKm,
             "Tiempo máx (min)" to b.etMaxTotalMinutes,
             "Umbral vuelta vacía (km)" to b.etDeadheadThresholdKm,
+            "Factor vuelta vacía" to b.etDeadheadReturnFactor,
             "Rating mín" to b.etMinPassengerRating,
             "Buena ganancia/km IA" to b.etAiGoodProfitPerKm
         )
@@ -223,6 +228,7 @@ vm.saveAll(
                 maintenancePerKm = b.etMaintenancePerKm.parseNumeric(),
                 manualCostPerKm = b.etManualCostPerKm.parseNumeric(),
                 avgSpeed = b.etAvgSpeed.parseNumeric(),
+                platformCommissionPercent = b.etPlatformCommission.parseNumeric(),
                 minFare = b.etMinFare.parseNumeric(),
                 primaryMetric = if (b.rbPrimaryKm.isChecked) "PER_KM" else "PER_HOUR",
                 minNetProfit = b.etMinNetProfit.parseNumeric(),
@@ -236,7 +242,9 @@ vm.saveAll(
                 blacklistEnabled = b.switchBlacklist.isChecked,
                 autoAcceptEnabled = b.switchAutoAccept.isChecked,
                 aiEnabled = b.switchAi.isChecked,
-                deadheadThresholdKm = b.etDeadheadThresholdKm.parseNumeric()
+                deadheadThresholdKm = b.etDeadheadThresholdKm.parseNumeric(),
+                deadheadReturnFactor = b.etDeadheadReturnFactor.parseNumeric(),
+                rejectOnUnknownRating = b.switchRejectUnknownRating.isChecked
             )
             vm.updateBehavior(
                 dryRunEnabled = b.switchDryRun.isChecked,

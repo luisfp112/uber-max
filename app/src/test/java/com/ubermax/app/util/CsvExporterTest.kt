@@ -34,10 +34,54 @@ class CsvExporterTest {
     )
 
     @Test
-    fun `cabecera tiene 17 columnas`() {
+    fun `cabecera tiene 29 columnas`() {
         val csv = CsvExporter.buildCsv(emptyList())
         val header = csv.lines().first().split(",")
-        assertEquals(17, header.size)
+        assertEquals(29, header.size)
+    }
+
+    @Test
+    fun `cabecera incluye las columnas de resultados reales`() {
+        val header = CsvExporter.buildCsv(emptyList()).lines().first()
+        for (col in listOf(
+            "tiene_rating", "minutos_estimados", "accion_aplicada", "resolucion",
+            "recomendacion_ia", "confianza_ia", "pickup_lat", "pickup_lng",
+            "dest_lat", "dest_lng"
+        )) {
+            assertTrue("Columna '$col' ausente en: $header", header.split(",").contains(col))
+        }
+    }
+
+    @Test
+    fun `la linea refleja resolucion accion aplicada rating y coordenadas`() {
+        val trip = makeTrip().copy(
+            hasRating = false,
+            minutesEstimated = true,
+            actionApplied = true,
+            resolution = "TAP_FAILED",
+            aiRecommendation = "IA local",
+            aiConfidence = 0.9,
+            pickupLat = -1.2345,
+            pickupLng = -78.6102,
+            destLat = -1.2800,
+            destLng = -78.6500
+        )
+        val row = CsvExporter.buildCsv(listOf(trip)).lines().last()
+        assertTrue(row.contains("false"))
+        assertTrue(row.contains("true"))
+        assertTrue(row.contains("TAP_FAILED"))
+        assertTrue(row.contains("IA local"))
+        assertTrue(row.contains("0.90"))
+        assertTrue(row.contains("-78.61")) // pickupLng
+        assertTrue(row.contains("-1.28")) // destLat
+    }
+
+    @Test
+    fun `coordenadas nulas se exportan vacias`() {
+        val row = CsvExporter.buildCsv(listOf(makeTrip())).lines().last()
+        val fields = row.split(",")
+        // pickup_lat / pickup_lng llegan al final vacíos por ser los últimos
+        assertEquals(29, fields.size)
     }
 
     @Test

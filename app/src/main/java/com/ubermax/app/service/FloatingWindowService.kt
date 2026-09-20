@@ -216,6 +216,7 @@ class FloatingWindowService : Service() {
 
         updateDecisionBadge(view, action, decision.simulated)
         updateReason(view, decision)
+        updateAiSummary(view, decision)
         updateNetProfit(view, eval.netProfit)
         view.findViewById<TextView>(R.id.tv_profit_per_km)?.text = "\$%.2f/km".format(eval.profitPerKm)
         updateDestination(view, offer.destination)
@@ -237,16 +238,17 @@ class FloatingWindowService : Service() {
                 badge.setBackgroundResource(R.drawable.hud_badge_accept)
             }
             Action.WARN -> {
-                badge.text = "❌ ${getString(R.string.hud_rejected)}"
-                badge.setBackgroundResource(R.drawable.hud_badge_reject)
+                // Sin acción automática: el conductor decide mirando el HUD.
+                badge.text = "⚠️ ${getString(R.string.hud_warned)}"
+                badge.setBackgroundResource(R.drawable.hud_badge_warn)
             }
             Action.CANCEL -> {
                 badge.text = "❌ ${getString(R.string.hud_rejected)}"
                 badge.setBackgroundResource(R.drawable.hud_badge_reject)
             }
             Action.IGNORE -> {
-                badge.text = "⏸ ${getString(R.string.hud_rejected)}"
-                badge.setBackgroundResource(R.drawable.hud_badge_reject)
+                badge.text = "⏸ ${getString(R.string.hud_no_action)}"
+                badge.setBackgroundResource(R.drawable.hud_badge_warn)
             }
         }
         if (simulated) {
@@ -284,6 +286,13 @@ class FloatingWindowService : Service() {
         DecisionReason.AUTO_ACCEPT_OFF -> getString(R.string.hud_reason_auto_accept_off)
     }
 
+    private fun updateAiSummary(view: View, decision: OfferDecision) {
+        val tvAi = view.findViewById<TextView>(R.id.tv_ai)
+        val summary = HudReasonFormatter.aiSummary(decision)
+        tvAi.text = summary
+        tvAi.visibility = if (summary.isBlank()) View.GONE else View.VISIBLE
+    }
+
     private fun updateNetProfit(view: View, netProfit: Double) {
         val tvProfit = view.findViewById<TextView>(R.id.tv_net_profit)
         tvProfit.text = "\$%.2f neta".format(netProfit)
@@ -296,7 +305,7 @@ class FloatingWindowService : Service() {
     private fun updateDestination(view: View, destination: String) {
         val tvDest = view.findViewById<TextView>(R.id.tv_destination)
         val text = if (destination.isBlank()) getString(R.string.hud_no_destination)
-                   else HudReasonFormatter.abbreviateDestination(destination)
+                   else destination.replace(Regex("\\s+"), " ").trim()
         tvDest.text = "📍 $text"
     }
 

@@ -12,4 +12,7 @@ import kotlinx.coroutines.flow.Flow
 interface TripHistorySource {
     /** Stream reactivo de todos los viajes registrados. */
     fun getAllTripsFlow(): Flow<List<TripLogEntity>>
+
+    /** Los [limit] viajes más recientes (para análisis con memoria acotada). */
+    suspend fun getRecentTrips(limit: Int): List<TripLogEntity>
 }

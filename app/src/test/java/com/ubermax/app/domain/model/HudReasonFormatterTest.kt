@@ -86,4 +86,36 @@ class HudReasonFormatterTest {
     fun `destino corto no se modifica`() {
         assertEquals("Ficoa", HudReasonFormatter.abbreviateDestination("Ficoa"))
     }
+
+    @Test
+    fun `aiSummary vacio sin recomendacion`() {
+        assertEquals("", HudReasonFormatter.aiSummary(decision(Action.WARN)))
+    }
+
+    @Test
+    fun `aiSummary con recomendacion y confianza incluye porcentaje`() {
+        val d = OfferDecision(
+            evaluatedOffer = evaluatedOffer(),
+            action = Action.WARN,
+            failedFilters = emptyList(),
+            aiRecommendation = "Buena elección basada en historial",
+            aiConfidence = 0.75
+        )
+        val result = HudReasonFormatter.aiSummary(d)
+        assertTrue(result.contains("Buena elección"))
+        assertTrue(result.contains("75%"))
+    }
+
+    @Test
+    fun `aiSummary con confianza cero omite el porcentaje`() {
+        val d = OfferDecision(
+            evaluatedOffer = evaluatedOffer(),
+            action = Action.ACCEPT,
+            failedFilters = emptyList(),
+            aiRecommendation = "IA: historial no disponible"
+        )
+        val result = HudReasonFormatter.aiSummary(d)
+        assertTrue(result.contains("IA: historial no disponible"))
+        assertTrue(result.contains("💡"))
+    }
 }

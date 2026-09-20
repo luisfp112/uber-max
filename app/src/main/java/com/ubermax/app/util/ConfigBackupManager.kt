@@ -96,6 +96,7 @@ object ConfigBackupManager {
         put("avgSpeedKmh", v.avgSpeedKmh)
         put("engineIdleCostPerHour", v.engineIdleCostPerHour)
         put("manualCostPerKm", v.manualCostPerKm)
+        put("platformCommissionPercent", v.platformCommissionPercent)
     }
 
     private fun vehicleFromJson(o: JSONObject?) = VehicleConfigEntity(
@@ -106,7 +107,8 @@ object ConfigBackupManager {
         maintenancePerKm = o?.optDouble("maintenancePerKm", 0.03) ?: 0.03,
         avgSpeedKmh = o?.optDouble("avgSpeedKmh", 22.0) ?: 22.0,
         engineIdleCostPerHour = o?.optDouble("engineIdleCostPerHour", 0.20) ?: 0.20,
-        manualCostPerKm = o?.optDouble("manualCostPerKm", 0.0) ?: 0.0
+        manualCostPerKm = o?.optDouble("manualCostPerKm", 0.0) ?: 0.0,
+        platformCommissionPercent = o?.optDouble("platformCommissionPercent", 9.0) ?: 9.0
     )
 
     private fun filterToJson(f: FilterRulesEntity) = JSONObject().apply {
@@ -124,6 +126,8 @@ object ConfigBackupManager {
         put("autoAcceptEnabled", f.autoAcceptEnabled)
         put("aiEnabled", f.aiEnabled)
         put("deadheadThresholdKm", f.deadheadThresholdKm)
+        put("deadheadReturnFactor", f.deadheadReturnFactor)
+        put("rejectOnUnknownRating", f.rejectOnUnknownRating)
     }
 
     private fun filterFromJson(o: JSONObject?) = FilterRulesEntity(
@@ -140,7 +144,9 @@ object ConfigBackupManager {
         blacklistEnabled = o?.optBoolean("blacklistEnabled", true) ?: true,
         autoAcceptEnabled = o?.optBoolean("autoAcceptEnabled", true) ?: true,
         aiEnabled = o?.optBoolean("aiEnabled", true) ?: true,
-        deadheadThresholdKm = o?.optDouble("deadheadThresholdKm", 8.0) ?: 8.0
+        deadheadThresholdKm = o?.optDouble("deadheadThresholdKm", 8.0) ?: 8.0,
+        deadheadReturnFactor = o?.optDouble("deadheadReturnFactor", 0.0) ?: 0.0,
+        rejectOnUnknownRating = o?.optBoolean("rejectOnUnknownRating", false) ?: false
     )
 
     private fun settingsToJson(s: AppSettingsEntity) = JSONObject().apply {

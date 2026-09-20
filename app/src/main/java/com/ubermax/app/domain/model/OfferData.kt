@@ -21,12 +21,22 @@ data class OfferData(
     val pickupMinutes: Int = 0,       // Tiempo de recogida en minutos
     val tripMinutes: Int = 0,         // Tiempo del viaje en minutos
     val estimatedMinutes: Int,        // Tiempo total estimado (pickup + trip)
-    val passengerRating: Double,      // Calificación del pasajero (0.0-5.0)
+    val passengerRating: Double,      // Calificación del pasajero (0.0-5.0; 0.0 si no visible)
     val passengerTrips: Int = 0,      // Número de viajes del pasajero
     val rideType: String = "",        // Tipo de viaje (UberX, Comfort, etc.)
     val destination: String = "",     // Dirección de destino del pasajero
     val pickupAddress: String = "",   // Dirección de recogida
     val rawTexts: List<String> = emptyList(), // Textos brutos para debug/calibración
+
+    /**
+     * True si la UI de Uber no expuso los minutos y hubo que estimarlos con la
+     * velocidad promedio configurada. Cuando es true, [EvaluateOfferUseCase]
+     * recalcula el tiempo usando el avgSpeedKmh del conductor.
+     */
+    val minutesAreEstimated: Boolean = false,
+
+    /** False si el parser no pudo leer el rating del pasajero (no inventar 5.0). */
+    val hasRating: Boolean = true,
 
     // Coordenadas opcionales — cuando la UI de Uber las exponga, habilitan el
     // point-in-polygon en RuleEngine para cancelar con precisión geográfica.

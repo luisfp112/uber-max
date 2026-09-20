@@ -22,35 +22,58 @@ class TripRepository @Inject constructor(
     private val tripLogDao: TripLogDao
 ) : TripHistorySource {
     /** Guardar una decisión de oferta en la base de datos */
-    suspend fun logDecision(decision: OfferDecision) {
+    suspend fun logDecision(
+        decision: OfferDecision,
+        actionApplied: Boolean = false,
+        resolution: String = "UNKNOWN"
+    ): Long {
         val calendar = Calendar.getInstance()
+        val offer = decision.evaluatedOffer.offer
         val entity = TripLogEntity(
             timestamp = System.currentTimeMillis(),
             dayOfWeek = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale("es")) ?: "Desconocido",
             hourOfDay = calendar.get(Calendar.HOUR_OF_DAY),
-            rawFare = decision.evaluatedOffer.offer.rawFare,
-            pickupKm = decision.evaluatedOffer.offer.pickupKm,
-            tripKm = decision.evaluatedOffer.offer.tripKm,
-            estimatedMinutes = decision.evaluatedOffer.offer.estimatedMinutes,
-            passengerRating = decision.evaluatedOffer.offer.passengerRating,
-            destination = decision.evaluatedOffer.offer.destination,
-            pickupAddress = decision.evaluatedOffer.offer.pickupAddress,
+            rawFare = offer.rawFare,
+            pickupKm = offer.pickupKm,
+            tripKm = offer.tripKm,
+            estimatedMinutes = offer.estimatedMinutes,
+            passengerRating = offer.passengerRating,
+            destination = offer.destination,
+            pickupAddress = offer.pickupAddress,
             fuelCost = decision.evaluatedOffer.fuelCost,
             netProfit = decision.evaluatedOffer.netProfit,
             profitPerKm = decision.evaluatedOffer.profitPerKm,
             profitPerHour = decision.evaluatedOffer.profitPerHour,
             totalKm = decision.evaluatedOffer.totalKm,
             decision = decision.action.name,
-            failedFilters = decision.failedFilters.joinToString(",")
+            failedFilters = decision.failedFilters.joinToString(","),
+            hasRating = offer.hasRating,
+            rideType = offer.rideType,
+            passengerTrips = offer.passengerTrips,
+            minutesEstimated = offer.minutesAreEstimated,
+            actionApplied = actionApplied,
+            resolution = resolution,
+            aiRecommendation = decision.aiRecommendation,
+            aiConfidence = decision.aiConfidence,
+            pickupLat = offer.pickupLatLng?.first,
+            pickupLng = offer.pickupLatLng?.second,
+            destLat = offer.destinationLatLng?.first,
+            destLng = offer.destinationLatLng?.second
         )
-        tripLogDao.insert(entity)
+        return tripLogDao.insert(entity)
+    }
+
+    /** Actualiza la resolución de un viaje ya registrado (resultado real). */
+    suspend fun updateResolution(id: Long, resolution: String) {
+        tripLogDao.updateResolution(id, resolution)
     }
 
     /** Stream reactivo de todos los viajes */
     override fun getAllTripsFlow(): Flow<List<TripLogEntity>> = tripLogDao.getAllTripsFlow()
 
-    /** Viajes recientes */
-    suspend fun getRecentTrips(limit: Int = 50) = tripLogDao.getRecentTrips(limit)
+    /** Los [limit] viajes más recientes */
+    override suspend fun getRecentTrips(limit: Int): List<TripLogEntity> =
+        tripLogDao.getRecentTrips(limit)
 
     /** Viajes de hoy */
     suspend fun getTodayTrips(): List<TripLogEntity> {

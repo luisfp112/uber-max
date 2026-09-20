@@ -7,6 +7,7 @@ import com.ubermax.app.domain.model.OfferData
 import com.ubermax.app.domain.model.OfferDecision
 import com.ubermax.app.domain.port.TripHistorySource
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -27,12 +28,15 @@ class SmartAdvisorTest {
         TripHistorySource {
         override fun getAllTripsFlow(): Flow<List<TripLogEntity>> =
             error?.let { flow<List<TripLogEntity>> { throw it } } ?: results ?: flowOf(emptyList())
+        override suspend fun getRecentTrips(limit: Int): List<TripLogEntity> =
+            error?.let { throw it } ?: results?.firstOrNull() ?: emptyList()
     }
 
     private fun tripLog(
         destination: String,
         profitPerKm: Double,
         decision: String = "ACCEPT",
+        resolution: String = "ASSIGNED",
         netProfit: Double = 3.5,
         rawFare: Double = 10.0,
         pickupAddress: String = "Av. Cevallos",
@@ -53,7 +57,8 @@ class SmartAdvisorTest {
         profitPerKm = profitPerKm,
         profitPerHour = 8.0,
         totalKm = pickupKm + tripKm,
-        decision = decision
+        decision = decision,
+        resolution = resolution
     )
 
     private fun evaluatedOffer(
@@ -126,8 +131,8 @@ class SmartAdvisorTest {
         val history = FakeHistory(
             results = flowOf(
                 listOf(
-                    tripLog("Ficoa, Ambato", profitPerKm = 0.05, decision = "WARN"),
-                    tripLog("Ficoa, Ambato", profitPerKm = 0.03, decision = "WARN")
+                    tripLog("Ficoa, Ambato", profitPerKm = 0.05, decision = "WARN", resolution = "TIMEOUT"),
+                    tripLog("Ficoa, Ambato", profitPerKm = 0.03, decision = "WARN", resolution = "TIMEOUT")
                 )
             )
         )
@@ -164,8 +169,8 @@ class SmartAdvisorTest {
         val history = FakeHistory(
             results = flowOf(
                 listOf(
-                    tripLog("Ficoa, Ambato", profitPerKm = 0.05, decision = "WARN"),
-                    tripLog("Ficoa, Ambato", profitPerKm = 0.02, decision = "WARN")
+                    tripLog("Ficoa, Ambato", profitPerKm = 0.05, decision = "WARN", resolution = "TIMEOUT"),
+                    tripLog("Ficoa, Ambato", profitPerKm = 0.02, decision = "WARN", resolution = "TIMEOUT")
                 )
             )
         )

@@ -11,7 +11,7 @@ import com.ubermax.app.util.RegexPatterns
  *
  * Soporta los DOS tipos de oferta que muestra Uber Driver:
  *   1. ASIGNADA  → tarjeta con botón "Aceptar" / "Aceptar viaje"
- *   2. ABIERTA    → tarjeta con botón "Viaje disponible" / "Postularse"
+ *   2. ABIERTA    → tarjeta con botón "Viaje disponible" / "Me interesa" / "Postularse"
  *
  * Estructura de la tarjeta de oferta (confirmada en screenshot):
  *
@@ -36,7 +36,7 @@ import com.ubermax.app.util.RegexPatterns
  * - "Viaje: X min (X.X km)" → trip distance/time
  * - Texto DESPUÉS de pickup pattern → pickup address
  * - Texto DESPUÉS de trip pattern → destination address
- * - Temporizadores ("Termina en 00:42") y botones ("Viaje disponible", "Postularse")
+ * - Temporizadores ("Termina en 00:42") y botones ("Viaje disponible", "Me interesa", "Postularse")
  *   se excluyen de las direcciones.
  *
  * El núcleo de extracción [parseFromTextNodes] es 100% JVM puro (sin tipos Android)
@@ -47,6 +47,10 @@ class OfferParser {
 
     companion object {
         private const val TAG = "OfferParser"
+
+        // Límite de profundidad del árbol: la tarjeta de oferta es poco profunda;
+        // cortar evita costes altos en pantallas muy anidadas.
+        private const val MAX_DEPTH = 60
 
         // Patrón: "A 6 min (1.8 km)" — recogida
         private val PICKUP_PATTERN = Regex(
@@ -75,9 +79,9 @@ class OfferParser {
         private val NON_ADDRESS_TEXTS = setOf(
             // Botones de oferta asignada
             "aceptar", "aceptar viaje", "confirmar", "rechazar", "cancelar", "no, gracias",
-            // Botones de oferta abierta
-            "viaje disponible", "postularse", "postularte", "postularme", "postular",
-            "aplicar", "apply", "apuntarse", "trip available", "accept",
+            // Botones de oferta abierta (Uber A/B: "Viaje disponible" o "Me interesa")
+            "viaje disponible", "me interesa", "postularse", "postularte", "postularme", "postular",
+            "aplicar", "apply", "apuntarse", "trip available", "i'm interested", "accept",
             // Miscelanáneos de la tarjeta
             "cerrar", "close", "dismiss", "decline",
             "en camino", "encamino", "asignado", "termina en", "finaliza en", "llega en"
@@ -218,18 +222,26 @@ class OfferParser {
             }
         }
 
-        val estimatedMinutes = if (pickupMinutes + tripMinutes > 0) {
+        // ── Tiempo total estimado ──
+        // Si los patrones específicos ("A X min", "Viaje: X min") no se encontraron,
+        // los minutos se estiman por distancia. El evaluador económico los recalcula
+        // con la velocidad promedio del conductor (ver EvaluateOfferUseCase).
+        val minutesFromPatterns = pickupNodeIndex != -1 && tripNodeIndex != -1
+        val estimatedMinutes = if (minutesFromPatterns) {
             pickupMinutes + tripMinutes
         } else {
             ((pickupKm + tripKm) / 22.0 * 60.0).toInt()
         }
 
         // ── Extraer rating ──
-        val (passengerRating, passengerTrips) = extractRating(nodes)
+        val (passengerRating, passengerTrips, passengerHasRating) = extractRating(nodes)
 
         // ── Extraer direcciones ──
         val pickupAddress = extractAddressAfterNode(nodes, pickupNodeIndex, tripNodeIndex)
         val destination = extractAddressAfterNode(nodes, tripNodeIndex, nodes.size)
+
+        // ── Coordenadas oportunistas: si la tarjeta expone pares lat/lng ──
+        val (pickupCoords, destCoords) = extractCoordinates(nodes)
 
         Logs.i(TAG, "═══ OFERTA PARSEADA ═══")
         Logs.i(TAG, "  💰 Tarifa: \$$rawFare | Tipo: $rideType")
@@ -249,8 +261,47 @@ class OfferParser {
             rideType = rideType,
             destination = destination,
             pickupAddress = pickupAddress,
+            minutesAreEstimated = !minutesFromPatterns,
+            hasRating = passengerHasRating,
+            destinationLatLng = destCoords,
+            pickupLatLng = pickupCoords,
             rawTexts = nodes.map { it.text }.filter { it.isNotEmpty() }
         )
+    }
+
+    /**
+     * Extrae pares de coordenadas (lat,lng) si la tarjeta los expone en texto.
+     *
+     * Oportunista: no todas las ofertas muestran coordenadas, por eso devuelve
+     * nulls si no hay evidencia clara. Regla posicional simple: el primer par
+     * lat/lng plausible que aparece en el árbol se asume recogida y el segundo
+     * destino (mismo orden visual de la tarjeta).
+     *
+     * Devuelve (pickupCoords, destinationCoords).
+     */
+    private fun extractCoordinates(
+        nodes: List<TextNode>
+    ): Pair<Pair<Double, Double>?, Pair<Double, Double>?> {
+        val coordNumber = Regex("""(-?\d{1,3}\.\d{4,})""")
+        val pairs = mutableListOf<Pair<Double, Double>>()
+
+        for (n in nodes) {
+            val combined = "${n.text} ${n.contentDesc}"
+            val numbers = coordNumber.findAll(combined)
+                .map { it.groupValues[1].toDouble() }
+                .toList()
+            for (i in 0 until numbers.lastIndex) {
+                val lat = numbers[i]
+                val lng = numbers[i + 1]
+                if (lat in -90.0..90.0 && lng in -180.0..180.0) {
+                    pairs.add(lat to lng)
+                    if (pairs.size >= 2) break
+                }
+            }
+            if (pairs.size >= 2) break
+        }
+
+        return pairs.getOrNull(0) to pairs.getOrNull(1)
     }
 
     /**
@@ -275,9 +326,10 @@ class OfferParser {
     /**
      * Extrae rating del pasajero.
      * Busca: "★ 4.73 (42)" o "4.73 ★" o similar.
-     * Retorna (rating, tripCount).
+     * Retorna (rating, tripCount, hasRating). hasRating=false cuando no hay
+     * evidencia de rating en la tarjeta: NUNCA se inventa un 5.0.
      */
-    private fun extractRating(nodes: List<TextNode>): Pair<Double, Int> {
+    private fun extractRating(nodes: List<TextNode>): Triple<Double, Int, Boolean> {
         // Buscar nodos con ★
         for (n in nodes) {
             val combined = "${n.text} ${n.contentDesc}"
@@ -288,7 +340,7 @@ class OfferParser {
                 val rating = RegexPatterns.parseRating(match.groupValues[1])
                 val trips = match.groupValues.getOrNull(2)?.toIntOrNull() ?: 0
                 if (rating in 1.0..5.0) {
-                    return rating to trips
+                    return Triple(rating, trips, true)
                 }
             }
         }
@@ -302,7 +354,7 @@ class OfferParser {
                 val ratingRegex = Regex("""([1-5][.,]\d{1,2})""")
                 val match = ratingRegex.find("${n.text} ${n.contentDesc}")
                 if (match != null) {
-                    return RegexPatterns.parseRating(match.groupValues[1]) to 0
+                    return Triple(RegexPatterns.parseRating(match.groupValues[1]), 0, true)
                 }
             }
         }
@@ -317,11 +369,11 @@ class OfferParser {
             val hasUnits = text.contains("km", true) || text.contains("min", true) ||
                 text.contains("$") || text.contains("COP", true)
             if (!hasUnits && value in 4.0..5.0) {
-                return value to 0
+                return Triple(value, 0, true)
             }
         }
 
-        return 5.0 to 0 // Default
+        return Triple(0.0, 0, false) // Rating no visible
     }
 
     /**
@@ -401,6 +453,7 @@ class OfferParser {
      * Recorre el árbol DFS y recolecta metadata de cada nodo (solo lado Android).
      */
     private fun collectNodes(node: AccessibilityNodeInfo, list: MutableList<NodeData>, depth: Int) {
+        if (depth > MAX_DEPTH) return
         val text = node.text?.toString()?.trim() ?: ""
         val desc = node.contentDescription?.toString()?.trim() ?: ""
         val className = node.className?.toString() ?: ""

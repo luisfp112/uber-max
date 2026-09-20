@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Receptores de pruebas SOLO DEBUG: no existen en release -->
+        <receiver
+            android:name=".service.SimulateOfferReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.ubermax.app.SIMULATE_OFFER" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

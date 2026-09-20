@@ -76,6 +76,8 @@
     <!-- HUD — decisión y motivos -->
     <string name="hud_accepted">ACEPTADO</string>
     <string name="hud_rejected">RECHAZADO</string>
+    <string name="hud_warned">SIN ACCIÓN — TÚ DECIDES</string>
+    <string name="hud_no_action">SIN ACCIÓN</string>
     <string name="hud_no_destination">Sin destino</string>
     <string name="hud_reason_accepted">Rentabilidad suficiente</string>
     <string name="hud_reason_blacklist">Zona en lista negra</string>

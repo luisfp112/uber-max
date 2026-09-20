@@ -13,6 +13,7 @@ class SmartAdvisorConfigTest {
 
     private val noopHistory = object : com.ubermax.app.domain.port.TripHistorySource {
         override fun getAllTripsFlow() = flowOf(emptyList<TripLogEntity>())
+        override suspend fun getRecentTrips(limit: Int) = emptyList<TripLogEntity>()
     }
 
     private fun trip(profitPerKm: Double, decision: String = "ACCEPT") = TripLogEntity(

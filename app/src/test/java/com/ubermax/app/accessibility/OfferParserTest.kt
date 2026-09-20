@@ -27,7 +27,10 @@ class OfferParserTest {
     private val parser = OfferParser()
     private val evaluator = EvaluateOfferUseCase()
     private val ruleEngine = RuleEngine()
-    private val vehicle = VehicleConfigEntity(manualCostPerKm = 0.08) // costPerKm manual = $0.08 USD
+    private val vehicle = VehicleConfigEntity(
+        manualCostPerKm = 0.08, // costPerKm manual = $0.08 USD
+        platformCommissionPercent = 0.0 // comisión: 0 para cuentas exactas de deadhead
+    )
 
     // ═══════════════════════════════════════════════════════
     //  Datos simulados de Uber Driver
@@ -69,6 +72,19 @@ class OfferParserTest {
         "Termina en 00:45",
         "Col. Escalón, SAN SALVADOR",
         "Postularse"
+    )
+
+    /** Oferta ABIERTA: botón "Me interesa" (nueva variante A/B de Uber). */
+    private fun openOfferMeInteresaTexts() = listOf(
+        "UberX",
+        "\$8.40",
+        "★ 4.92 (120)",
+        "A 4 min (1.0 km)",
+        "Parque Central, AMBATO",
+        "Viaje: 20 min (8.0 km)",
+        "Termina en 00:45",
+        "Calle 12 y Av. Bolívar, CIUDAD MERLOT",
+        "Me interesa"
     )
 
     private fun nodesOf(vararg texts: String): List<OfferParser.TextNode> =
@@ -140,6 +156,31 @@ class OfferParserTest {
         assertEquals(120, offer.passengerTrips)
         assertEquals("Col. Escalón, SAN SALVADOR", offer.destination)
         assertEquals("Parque Central, AMBATO", offer.pickupAddress)
+    }
+
+    @Test
+    fun `oferta abierta con Me interesa se parsea completa`() {
+        val offer = parser.parseFromTextNodes(
+            nodesOf(*openOfferMeInteresaTexts().toTypedArray())
+        )
+
+        assertNotNull(offer)
+        assertEquals(8.40, offer!!.rawFare, 0.001)
+        assertEquals(4.92, offer.passengerRating, 0.001)
+        assertEquals(120, offer.passengerTrips)
+        assertEquals("Calle 12 y Av. Bolívar, CIUDAD MERLOT", offer.destination)
+        assertEquals("Parque Central, AMBATO", offer.pickupAddress)
+    }
+
+    @Test
+    fun `el boton Me interesa nunca contamina el destino`() {
+        val offer = parser.parseFromTextNodes(
+            nodesOf(*openOfferMeInteresaTexts().toTypedArray())
+        )
+        assertNotNull(offer)
+        assertFalse(offer!!.destination.contains("Me interesa", ignoreCase = true))
+        assertFalse(offer.destination.contains("interesa", ignoreCase = true))
+        assertFalse(offer.pickupAddress.contains("Me interesa", ignoreCase = true))
     }
 
     @Test
@@ -215,12 +256,54 @@ class OfferParserTest {
     }
 
     @Test
-    fun `sin rating visible se usa el default 5 punto 0`() {
+    fun `sin rating visible se usa default honesto 0 con hasRating false`() {
         val offer = parser.parseFromTextNodes(
             nodesOf("UberX", "\$8.40", "A 4 min (1.0 km)", "Viaje: 20 min (8.0 km)", "Destino")
         )
         assertNotNull(offer)
-        assertEquals(5.0, offer!!.passengerRating, 0.001)
+        assertEquals(0.0, offer!!.passengerRating, 0.001)
+        assertFalse(offer.hasRating) // el parser ya NO inventa un 5.0
+    }
+
+    @Test
+    fun `rating visible marca hasRating true`() {
+        val offer = parser.parseFromTextNodes(
+            nodesOf(*assignedOfferTexts().toTypedArray())
+        )
+        assertNotNull(offer)
+        assertTrue(offer!!.hasRating)
+        assertEquals(4.73, offer.passengerRating, 0.001)
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  PARSE — Coordenadas oportunistas (lat/lng en la tarjeta)
+    // ═══════════════════════════════════════════════════════
+
+    @Test
+    fun `primer par de coordenadas es pickup y segundo destino`() {
+        val offer = parser.parseFromTextNodes(
+            nodesOf(
+                "UberX", "\$10.00", "★ 4.73 (42)",
+                "A 3 min (1.0 km)", "Pickup",
+                "-1.2345,-78.6102",
+                "Viaje: 30 min (12.0 km)", "Destino",
+                "-1.2800,-78.6500",
+                "Aceptar"
+            )
+        )
+        assertNotNull(offer)
+        assertEquals(-1.2345 to -78.6102, offer!!.pickupLatLng)
+        assertEquals(-1.2800 to -78.6500, offer.destinationLatLng)
+    }
+
+    @Test
+    fun `sin coordenadas en la tarjeta los latlng quedan nulos`() {
+        val offer = parser.parseFromTextNodes(
+            nodesOf(*assignedOfferTexts().toTypedArray())
+        )
+        assertNotNull(offer)
+        assertNull(offer!!.pickupLatLng)
+        assertNull(offer.destinationLatLng)
     }
 
     // ═══════════════════════════════════════════════════════
@@ -237,7 +320,9 @@ class OfferParserTest {
         assertEquals(1.2, offer.pickupKm, 0.001)
         assertEquals(12.5, offer.tripKm, 0.001)
         assertEquals(18, offer.tripMinutes)
-        assertEquals(18, offer.estimatedMinutes)
+        // Sin patrones los minutos se estiman por distancia (a 22 km/h) y se marca como estimado
+        assertEquals(37, offer.estimatedMinutes) // (1.2 + 12.5) / 22 * 60
+        assertTrue(offer.minutesAreEstimated)
     }
 
     @Test
@@ -290,13 +375,41 @@ class OfferParserTest {
     }
 
     @Test
-    fun `viaje largo aplica penalizacion por vuelta vacia`() {
+    fun `oferta abierta con Me interesa se ACEPTA`() {
+        val offer = parser.parseFromTextNodes(
+            nodesOf(*openOfferMeInteresaTexts().toTypedArray())
+        )!!
+        val decision = ruleEngine.evaluate(
+            evaluator.evaluate(offer, vehicle), FilterRulesEntity(), emptyList(), emptyList()
+        )
+
+        assertEquals(Action.ACCEPT, decision.action)
+    }
+
+    @Test
+    fun `viaje largo aplica penalizacion por vuelta vacia cuando el factor esta activo`() {
         val offer = parser.parseFromTextNodes(nodesOf(*assignedOfferTexts().toTypedArray()))!!
-        val evaluated = evaluator.evaluate(offer, vehicle)
+        // factor activo (1.0): vuelta vacía con rampa desde 8km → 12km * 1.0 * ((12-8)/8) = 6km
+        val evaluated = evaluator.evaluate(
+            offer, vehicle, deadheadThresholdKm = 8.0, deadheadReturnFactor = 1.0
+        )
 
         assertTrue(evaluated.hasDeadheadPenalty) // trip > 8km
-        assertEquals(12.0, evaluated.returnKm, 0.001)
-        assertEquals(25.0, evaluated.totalKm, 0.001) // 1 + 12 + 12 de retorno
+        assertEquals(6.0, evaluated.returnKm, 0.001)
+        assertEquals(19.0, evaluated.totalKm, 0.001) // 1 + 12 + 6 de retorno
+    }
+
+    @Test
+    fun `viaje largo sin factor activo no aplica vuelta vacia`() {
+        val offer = parser.parseFromTextNodes(nodesOf(*assignedOfferTexts().toTypedArray()))!!
+        // factor por defecto 0.0 → deadhead desactivado (el conductor debe habitarlo)
+        val evaluated = evaluator.evaluate(
+            offer, vehicle, deadheadThresholdKm = 8.0, deadheadReturnFactor = 0.0
+        )
+
+        assertFalse(evaluated.hasDeadheadPenalty)
+        assertEquals(0.0, evaluated.returnKm, 0.001)
+        assertEquals(13.0, evaluated.totalKm, 0.001) // 1 + 12, sin retorno
     }
 
     @Test

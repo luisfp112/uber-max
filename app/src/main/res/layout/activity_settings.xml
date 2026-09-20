@@ -115,6 +115,20 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:hint="Comisión de la plataforma (% por viaje)"
+            android:layout_marginBottom="6dp"
+            android:textColorHint="@color/text_tertiary">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_platform_commission"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:hint="Mantenimiento/depreciación ($/km)"
             android:layout_marginBottom="6dp"
             android:textColorHint="@color/text_tertiary">
@@ -242,10 +256,28 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Umbral vuelta vacía (km, ej: 8)"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="6dp"
             android:textColorHint="@color/text_tertiary">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_deadhead_threshold_km"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Factor vuelta vacía (0=desactivado, ej: 1.0)"
+            android:layout_marginBottom="16dp"
+            android:textColorHint="@color/text_tertiary"
+            app:endIconMode="custom"
+            app:endIconDrawable="@android:drawable/ic_menu_info_details"
+            app:endIconTint="@color/info"
+            app:endIconContentDescription="Cuántos km de regreso vacío se suman: 0 = sin vuelta vacía; 1.0 = vuelta completa">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_deadhead_return_factor"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_primary"
@@ -279,6 +311,14 @@
                 android:textColor="@color/text_primary"
                 android:inputType="numberDecimal" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_reject_unknown_rating"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rechazar ofertas sin rating visible"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="16dp" />
 
         <!-- ═══ FILTROS DE RENTABILIDAD ═══ -->
         <TextView

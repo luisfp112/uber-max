@@ -69,7 +69,22 @@ data class FilterRulesEntity(
     @ColumnInfo(name = "ai_enabled")
     val aiEnabled: Boolean = true,           // Activar recomendaciones IA
 
-    // ── Deadhead ──
+// ── Deadhead ──
     @ColumnInfo(name = "deadhead_threshold_km")
-    val deadheadThresholdKm: Double = 8.0    // Umbral de km para aplicar penalización de vuelta vacía
+    val deadheadThresholdKm: Double = 8.0,   // Umbral base de km para vuelta vacía
+
+    /**
+     * Factor de vuelta vacía (0 = desactivado, 0.5 = mitad, 1.0 = completa).
+     * Solo se aplica cuando el conductor lo activa (> 0): penaliza en rampa
+     * suave desde el umbral hasta el doble del umbral.
+     */
+    @ColumnInfo(name = "deadhead_return_factor")
+    val deadheadReturnFactor: Double = 0.0,
+
+    /**
+     * Con rating desconocido (el parser no lo ve en la tarjeta):
+     * false = el filtro de rating se omite; true = la oferta no cumple (WARN).
+     */
+    @ColumnInfo(name = "reject_on_unknown_rating")
+    val rejectOnUnknownRating: Boolean = false
 )

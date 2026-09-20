@@ -23,6 +23,7 @@ data class SettingsState(
     val maintenancePerKm: Double = 0.03,
     val manualCostPerKm: Double = 0.0,
     val avgSpeed: Double = 22.0,
+    val platformCommissionPercent: Double = 9.0,
 
     // Filtros de Tarifa Bruta (guarda opcional, 0 = off)
     val minFare: Double = 0.0,
@@ -55,6 +56,10 @@ data class SettingsState(
 
     // Deadhead
     val deadheadThresholdKm: Double = 8.0,
+    val deadheadReturnFactor: Double = 0.0,
+
+    // Pasajero: rechazar ofertas cuyo rating no se pudo leer
+    val rejectOnUnknownRating: Boolean = false,
 
     // Comportamiento operativo
     val dryRunEnabled: Boolean = false,
@@ -94,6 +99,7 @@ class SettingsViewModel @Inject constructor(
                 maintenancePerKm = vc.maintenancePerKm,
                 manualCostPerKm = vc.manualCostPerKm,
                 avgSpeed = vc.avgSpeedKmh,
+                platformCommissionPercent = vc.platformCommissionPercent,
                 minFare = fr.minFare,
                 primaryMetric = fr.primaryMetric,
                 minNetProfit = fr.minNetProfit,
@@ -108,6 +114,8 @@ class SettingsViewModel @Inject constructor(
                 autoAcceptEnabled = fr.autoAcceptEnabled,
                 aiEnabled = fr.aiEnabled,
                 deadheadThresholdKm = fr.deadheadThresholdKm,
+                deadheadReturnFactor = fr.deadheadReturnFactor,
+                rejectOnUnknownRating = fr.rejectOnUnknownRating,
                 dryRunEnabled = settings.dryRunEnabled,
                 autoStartOnBoot = settings.autoStartOnBoot,
                 notifyDecisions = settings.notifyDecisions,
@@ -129,6 +137,7 @@ class SettingsViewModel @Inject constructor(
         maintenancePerKm: Double,
         manualCostPerKm: Double,
         avgSpeed: Double,
+        platformCommissionPercent: Double = 9.0,
         minFare: Double,
         primaryMetric: String,
         minNetProfit: Double,
@@ -142,7 +151,9 @@ class SettingsViewModel @Inject constructor(
         blacklistEnabled: Boolean,
         autoAcceptEnabled: Boolean,
         aiEnabled: Boolean,
-        deadheadThresholdKm: Double = 8.0
+        deadheadThresholdKm: Double = 8.0,
+        deadheadReturnFactor: Double = 0.0,
+        rejectOnUnknownRating: Boolean = false
     ) {
         viewModelScope.launch {
             configRepository.updateVehicleConfig(VehicleConfigEntity(
@@ -152,7 +163,8 @@ class SettingsViewModel @Inject constructor(
                 fuelPricePerUnit = fuelPricePerUnit,
                 maintenancePerKm = maintenancePerKm,
                 manualCostPerKm = manualCostPerKm,
-                avgSpeedKmh = avgSpeed
+                avgSpeedKmh = avgSpeed,
+                platformCommissionPercent = platformCommissionPercent
             ))
             configRepository.updateFilterRules(FilterRulesEntity(
                 minFare = minFare,
@@ -168,7 +180,9 @@ class SettingsViewModel @Inject constructor(
                 blacklistEnabled = blacklistEnabled,
                 autoAcceptEnabled = autoAcceptEnabled,
                 aiEnabled = aiEnabled,
-                deadheadThresholdKm = deadheadThresholdKm
+                deadheadThresholdKm = deadheadThresholdKm,
+                deadheadReturnFactor = deadheadReturnFactor,
+                rejectOnUnknownRating = rejectOnUnknownRating
             ))
         }
     }

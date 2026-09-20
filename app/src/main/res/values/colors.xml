@@ -35,7 +35,8 @@
     <color name="hud_border">#4400D4AA</color>
     <color name="hud_accept">#FF00E676</color>
     <color name="hud_reject">#FFFF5252</color>
-    <color name="hud_ignore">#FFFF5252</color>
+    <color name="hud_warn">#FFFFC107</color>
+    <color name="hud_ignore">#FFFFC107</color>
     <color name="hud_badge_text">#FF0D1117</color>
 
     <!-- Chart colors -->
