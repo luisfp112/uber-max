@@ -3,6 +3,22 @@
 Todas las versiones notables de UberMax se documentan aquí.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 
+## [1.1.0] - 2026-09-20
+
+### Añadido
+
+- Reconocimiento de la variante A/B de Uber Driver: ofertas abiertas con botón
+  "Me interesa" además de "Viaje disponible" / "Postularse" (parser + tap + tests).
+- HUD flotante: dirección de destino completa y prominente (2 líneas) junto al motivo.
+
+### Mejoras
+
+- Releases profesionales: `assembleRelease` firmado con keystore de release dedicado
+  (`keystore/ubermax-release.jks`) y artefacto limpio `UberMax-1.1.0.apk`.
+- Depuración en dispositivo: hook de simulación de ofertas (solo build debug) para
+  inyectar tarifas de prueba por adb sin tocar Uber.
+- Dashboard: refresco de estado corregido al iniciar/detener el monitoreo.
+
 ## [1.0.0] - 2026-09-17
 
 Versión inicial publicada.

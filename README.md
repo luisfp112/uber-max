@@ -14,7 +14,7 @@ directamente (sin tienda).
 
 Pasos de instalacion:
 
-1. Descarga el APK `UberMax-<version>-debug.apk` desde los releases.
+1. Descarga el APK `UberMax-<version>.apk` desde los releases.
 2. Abre el archivo desde el gestor de descargas o el navegador.
 3. Si Android solicita permisos de "origenes desconocidos", concedelos para esta instalacion.
 4. Completa el asistente de configuracion inicial (permisos obligatorios) en la app.
@@ -126,10 +126,15 @@ app/src/main/java/com/ubermax/app/
 ## Build y tests
 
 ```bash
-./gradlew assembleDebug            # APK: app/build/outputs/apk/debug/UberMax-1.0.0-debug.apk
+./gradlew assembleDebug            # APK dev: app/build/outputs/apk/debug/UberMax-1.1.0-debug.apk
+./gradlew assembleRelease          # APK release firmado: app/build/outputs/apk/release/UberMax-1.1.0.apk
 ./gradlew testDebugUnitTest        # Tests unitarios JVM
 ./gradlew lintDebug                # Lint de Android (falla con errores)
 ```
+
+Los APK de release se firman con el keystore dedicado `keystore/ubermax-release.jks`
+(credenciales en `keystore/keystore.properties`, versionados en el repo para builds
+reproducibles en CI sin secrets externos).
 
 Los tests unitarios son 100% JVM (sin dispositivo) y cubren el parser, el motor de reglas, la
 lista negra normalizada, la penalizacion por vuelta vacia, la geometria de poligonos, el

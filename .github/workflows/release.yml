@@ -30,11 +30,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run tests + lint + build APK
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --stacktrace
+      - name: Run tests + lint + build release APK
+        run: ./gradlew testDebugUnitTest lintDebug assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK to release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/UberMax-*.apk
+          files: app/build/outputs/apk/release/UberMax-*.apk
           generate_release_notes: true

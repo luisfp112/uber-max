@@ -5,6 +5,15 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+import java.util.Properties
+
+// Credenciales de firma de RELEASE (keystore versionado en keystore/).
+// Keystore propio para CI/local: sin secrets externos; repos privado.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore/keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 android {
     namespace = "com.ubermax.app"
     compileSdk = 34
@@ -13,8 +22,8 @@ android {
         applicationId = "com.ubermax.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         // Versionado: versionCode único por release y versionName en SemVer (X.Y.Z).
         // Cada release va etiquetado en git como v<versionName> (ver README -> Versionado).
 
@@ -26,6 +35,15 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file((keystoreProps["storeFile"] as? String) ?: "keystore/ubermax-release.jks")
+            storePassword = keystoreProps["storePassword"] as String? ?: ""
+            keyAlias = (keystoreProps["keyAlias"] as? String) ?: "ubermax"
+            keyPassword = keystoreProps["keyPassword"] as String? ?: ""
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -33,6 +51,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false
@@ -52,14 +71,15 @@ android {
         viewBinding = true
     }
 
-    // Artefacto versionado: UberMax-<versionName>-<buildType>.apk
-    // La versión se incrementa con cada release (ver README -> Versionado).
+    // Artefactos: release -> UberMax-<versionName>.apk (sin 'debug'),
+    // debug   -> UberMax-<versionName>-debug.apk (desarrollo local).
     applicationVariants.all {
         val appVersion = versionName
         val buildTypeName = buildType.name
         outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "UberMax-${appVersion}-${buildTypeName}.apk"
+            val suffix = if (buildTypeName == "release") "" else "-${buildTypeName}"
+            output.outputFileName = "UberMax-${appVersion}${suffix}.apk"
         }
     }
 }

@@ -23,9 +23,14 @@ local.properties
 Thumbs.db
 
 # Keystore / credenciales
+# Negro por defecto, excepto el keystore de RELEASE versionado en keystore/
+# (repo privado; firma reproducible en CI sin secrets externos).
 *.jks
 *.keystore
 keystore.properties
+!keystore/
+!keystore/ubermax-release.jks
+!keystore/keystore.properties
 
 # Logs
 *.log
