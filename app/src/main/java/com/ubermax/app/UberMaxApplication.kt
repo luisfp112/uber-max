@@ -11,7 +11,6 @@ class UberMaxApplication : Application() {
 
     companion object {
         const val NOTIFICATION_CHANNEL_ID = "ubermax_monitor"
-        const val DECISION_CHANNEL_ID = "ubermax_decisions"
     }
 
     override fun onCreate() {
@@ -32,17 +31,6 @@ class UberMaxApplication : Application() {
                 setShowBadge(false)
             }
             notificationManager.createNotificationChannel(monitorChannel)
-
-            val decisionChannel = NotificationChannel(
-                DECISION_CHANNEL_ID,
-                getString(R.string.decision_channel_name),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = getString(R.string.decision_channel_description)
-                setShowBadge(true)
-                enableVibration(false)
-            }
-            notificationManager.createNotificationChannel(decisionChannel)
         }
     }
 }

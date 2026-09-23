@@ -214,9 +214,8 @@ class FloatingWindowService : Service() {
         val eval = decision.evaluatedOffer
         val action = decision.action
 
-        updateDecisionBadge(view, action, decision.simulated)
+        updateDecisionBadge(view, action)
         updateReason(view, decision)
-        updateAiSummary(view, decision)
         updateNetProfit(view, eval.netProfit)
         view.findViewById<TextView>(R.id.tv_profit_per_km)?.text = "\$%.2f/km".format(eval.profitPerKm)
         updateDestination(view, offer.destination)
@@ -224,13 +223,11 @@ class FloatingWindowService : Service() {
         val symbol = if (action == Action.ACCEPT) "✅" else "❌"
         view.findViewById<TextView>(R.id.tv_collapsed)?.text = "$symbol \$%.2f".format(eval.netProfit)
 
-        if (action != Action.IGNORE) {
-            expand()
-            scheduleAutoCollapse()
-        }
+        expand()
+        scheduleAutoCollapse()
     }
 
-    private fun updateDecisionBadge(view: View, action: Action, simulated: Boolean) {
+    private fun updateDecisionBadge(view: View, action: Action) {
         val badge = view.findViewById<TextView>(R.id.tv_decision)
         when (action) {
             Action.ACCEPT -> {
@@ -242,17 +239,6 @@ class FloatingWindowService : Service() {
                 badge.text = "⚠️ ${getString(R.string.hud_warned)}"
                 badge.setBackgroundResource(R.drawable.hud_badge_warn)
             }
-            Action.CANCEL -> {
-                badge.text = "❌ ${getString(R.string.hud_rejected)}"
-                badge.setBackgroundResource(R.drawable.hud_badge_reject)
-            }
-            Action.IGNORE -> {
-                badge.text = "⏸ ${getString(R.string.hud_no_action)}"
-                badge.setBackgroundResource(R.drawable.hud_badge_warn)
-            }
-        }
-        if (simulated) {
-            badge.text = "${badge.text} · ${getString(R.string.hud_simulation)}"
         }
     }
 
@@ -267,7 +253,6 @@ class FloatingWindowService : Service() {
     private fun mainReason(decision: OfferDecision): String =
         when (val reason = HudReasonFormatter.mainReason(decision)) {
             HudReason.Accepted -> getString(R.string.hud_reason_accepted)
-            HudReason.Blacklist -> getString(R.string.hud_reason_blacklist)
             is HudReason.Raw -> reason.text
             is HudReason.Known -> getReasonLabel(reason.reason)
             HudReason.None -> ""
@@ -275,22 +260,14 @@ class FloatingWindowService : Service() {
 
     private fun getReasonLabel(reason: DecisionReason): String = when (reason) {
         DecisionReason.LOW_FARE -> getString(R.string.hud_reason_low_fare)
-        DecisionReason.LOW_NET -> getString(R.string.hud_reason_low_net)
         DecisionReason.LOW_PER_KM -> getString(R.string.hud_reason_low_per_km)
-        DecisionReason.LOW_PER_HOUR -> getString(R.string.hud_reason_low_per_hour)
         DecisionReason.PICKUP_FAR -> getString(R.string.hud_reason_pickup_far)
+        DecisionReason.PICKUP_TIME -> getString(R.string.hud_reason_pickup_time)
         DecisionReason.TRIP_LONG -> getString(R.string.hud_reason_trip_long)
+        DecisionReason.TRIP_DISTANCE -> getString(R.string.hud_reason_trip_distance)
+        DecisionReason.OUT_OF_PERIMETER -> getString(R.string.hud_reason_out_of_perimeter)
         DecisionReason.LOW_RATING -> getString(R.string.hud_reason_low_rating)
-        DecisionReason.DEADHEAD -> getString(R.string.hud_reason_deadhead)
-        DecisionReason.BLACKLIST -> getString(R.string.hud_reason_blacklist)
         DecisionReason.AUTO_ACCEPT_OFF -> getString(R.string.hud_reason_auto_accept_off)
-    }
-
-    private fun updateAiSummary(view: View, decision: OfferDecision) {
-        val tvAi = view.findViewById<TextView>(R.id.tv_ai)
-        val summary = HudReasonFormatter.aiSummary(decision)
-        tvAi.text = summary
-        tvAi.visibility = if (summary.isBlank()) View.GONE else View.VISIBLE
     }
 
     private fun updateNetProfit(view: View, netProfit: Double) {

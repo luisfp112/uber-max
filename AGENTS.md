@@ -1,154 +1,144 @@
-# AGENTS.md — Guia para Agentes (UberMax)
+# AGENTS.md — Guía para Agentes (UberMax)
 
-## Visión General
+## Estado del repo (léelo primero)
 
-**UberMax** es una app Android que automatiza aceptar/rechazar ofertas de Uber Driver
-mediante un `AccessibilityService`, evaluando rentabilidad en tiempo real.
-Clean Architecture + MVVM + Hilt. `applicationId` / `namespace` = `com.ubermax.app`.
+- `main` (HEAD) está en v1.1.0 PERO el working tree contiene un **refactor v1.2.0 sin commitear**:
+  muchos archivos de HEAD están borrados y otros son nuevos. `git status` muestra el alcance real.
+- **README.md y CHANGELOG.md están desactualizados**: describen features que ya NO existen en el
+  working tree (mapa OSMDroid, lista negra de texto y zonas, historial, SmartAdvisor/IA, comandos
+  de voz, auto-arranque, dry-run, export CSV, deadhead, métrica por hora, decisión ACCEPT/WARN/CANCEL).
+- Fuente de verdad = código + las migraciones Room de `AppDatabase` (documentan cada feature que se
+  quitó entre v10→v15). No "restaures" features del README; el refactor las eliminó deliberadamente.
 
-## Arquitectura real (verificada)
+## Arquitectura (estado actual)
 
-- `ui/`: Activities + ViewModels (StateFlow) · `domain/`: reglas, IA, use cases, modelos ·
-  `data/`: Room (DAO + Entity) + repositorios + geocoding · `accessibility/`: parser, taps,
-  geometría · `service/`: AccessibilityService, foreground services, HUD · `util/`: texto,
-  regex, logging, CSV.
-- **La separación de capas NO es estricta.** `domain/` importa `com.ubermax.app.data.db.entity.*`
-  (entidades Room) en `EvaluateOfferUseCase`, `RuleEngine`, `SmartAdvisor` y `domain/port/TripHistorySource`.
-  Solo `domain/model/*` es Kotlin puro. No intentes "purificar" `domain/` sin que se pida.
-- `SmartAdvisor` no depende del repositorio: depende del puerto `domain/port/TripHistorySource`,
-  bindeado a `TripRepository` en `di/DomainModule` (`@Binds`). Los tests usan fakes de ese puerto;
-  **Mockito fue eliminado del proyecto** (no lo reintroduzcas).
-- Directorios vacíos (placeholders): `data/datastore`, `data/worker`, `screen`, `ui/overlay`,
-  `ui/theme`. La dependencia DataStore existe pero **no se usa**; la config vive en Room.
+Clean Architecture + MVVM + Hilt, un solo módulo `:app`. `applicationId`/`namespace` = `com.ubermax.app`.
+
+- `ui/` (dashboard, settings, onboarding — sin ViewModel en dashboard) · `domain/` (rules, model,
+  geo, usecase) · `data/` (Room DB/DAO/entity, geocoding, repository) · `accessibility/` (parser,
+  taps) · `service/` (AccessibilityService, foreground services, HUD) · `util/` (normalización,
+  regex, logging, backup).
+- **La separación de capas NO es estricta.** `domain/` importa entidades Room
+  (`data.db.entity.*`) en `EvaluateOfferUseCase`, `RuleEngine`. Solo `domain/model/*` y
+  `domain/geo/*` son JVM puro. No intentes "purificar" `domain/` sin que se pida.
+- Directorios `domain/ai`, `domain/port`, tests en `domain/geometry`, `app/src/androidTest/` están
+  vacíos (restos de features eliminadas): ignóralos.
 
 ## Comandos
 
 ```bash
-./gradlew assembleDebug          # APK: app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleDebug          # APK: app/build/outputs/apk/debug/UberMax-<version>-debug.apk
+./gradlew assembleRelease        # APK firmado: app/build/outputs/apk/release/UberMax-<version>.apk (sin sufijo)
 ./gradlew testDebugUnitTest      # tests JVM (sin dispositivo)
-./gradlew lintDebug              # FALLA si hay errores de lint (no hay baseline)
+./gradlew lintDebug              # FALLA con errores de lint (no hay baseline)
 ```
 
 - Un solo test: `./gradlew testDebugUnitTest --tests "com.ubermax.app.domain.rules.RuleEngineTest"`
-- CI (`.github/workflows/ci.yml`) corre: `./gradlew testDebugUnitTest assembleDebug lintDebug --no-daemon --stacktrace`
-- **Gotcha de entorno:** en esta máquina el daemon de Gradle se detiene solo y KSP lanza
-  errores internos esporádicos. Reintentar con `--no-daemon` normalmente lo resuelve.
+- CI (`.github/workflows/ci.yml`) ejecuta: `./gradlew testDebugUnitTest assembleDebug lintDebug --no-daemon --stacktrace`
+- JDK 17 tiene que estar disponible; funciona también con JDK 21 de sistema (target 17 via jvmTarget).
+- Gotcha de esta máquina: el daemon de Gradle/KSP falla a veces de forma esporádica; reintentar con
+  `--no-daemon` normalmente lo resuelve.
 
 ## Testing
 
-- Todo **JVM puro**: sin dispositivo, sin Robolectric, sin Mockito. `app/src/androidTest/` está vacío.
-- Para logs en lógica pura usa `util/Logs` (no `android.util.Log`): en la JVM de test, `android.jar`
+- Tests 100% JVM puro: sin dispositivo, sin Robolectric, sin Mockito (fue eliminado; no lo reintroduzcas).
+- En lógica testeable usa `util/Logs` (no `android.util.Log`): en la JVM de test `android.jar`
   mockable lanza `RuntimeException("not mocked")`.
-- Cualquier comportamiento decisional nuevo requiere tests. Suite actual: parser, ActionExecutor,
-  VehicleConfig, RuleEngine, PolygonGeometry, SmartAdvisor (+ config), PipelineIntegration, CsvExporter,
-  ReasonMapper, HudReasonFormatter, PermissionStatus, ConfigBackupManager, VoiceCommandParser,
-  HistoryViewModel.
+- Todo comportamiento decisional nuevo requiere tests. `LocationIqGeocoder` testea solo la parte
+  pura (parse/buildQuery/nameMatches), nunca red.
 
-## Flujo de una Oferta
+## Pipeline de una oferta
 
 ```
 Evento de Uber Driver (com.ubercab.driver)
-  -> UberAccessibilityService.processEvent()   # debounce 3s + dedup por tarifa 10s
+  -> UberAccessibilityService.processEvent()   # debounce 3s + dedup por huella 10s
     -> OfferParser.parseOffer(rootNode)        -> OfferData
+    -> LocationIqGeocoder.geocode()            # SOLO si geoCheckEnabled + geoApiKey (fail-open)
     -> EvaluateOfferUseCase.evaluate()         -> EvaluatedOffer
-    -> RuleEngine.evaluate()                   -> OfferDecision
-    -> SmartAdvisor.analyzeOffer()             -> OfferDecision enriquecido
-    -> dryRunEnabled? marca simulated=true, omite taps y notifica
-    -> ActionExecutor.clickAccept/Dismiss()    -> taps sobre la UI
-    -> TripRepository.logDecision()            -> Room DB
+    -> RuleEngine.evaluate()                   -> OfferDecision (ACCEPT | WARN)
     -> decisionFlow.emit()                     -> HUD flotante
-    -> DecisionNotifier.feedback()             -> notificación + vibración/sonido
-  VoiceCommandBus -> UberAccessibilityService.handleVoiceCommand() -> taps
+    -> DecisionNotifier.feedback()             -> TTS opt-in (voice_announce_enabled)
+    -> ActionExecutor.clickAcceptButton()      # SOLO en ACCEPT
 ```
 
-Notas de features nuevas:
-- **Modo simulación** (`AppSettingsEntity.dryRunEnabled`): evalúa, registra y muestra el HUD con
-  badge "SIMULACIÓN", pero nunca pulsa en Uber.
-- **Comandos de voz** (opt-in `voiceControlEnabled`, requiere READ_AUDIO): `VoiceCommandService`
-  publica en `VoiceCommandBus`; el parser puro es `VoiceCommandParser`.
-- **Auto-arranque**: `BootReceiver` (al reiniciar) y `CarConnectionReceiver` (Bluetooth de audio),
-  ambos condicionados por `AppSettingsEntity`.
-- **Backup**: `ConfigBackupManager` (JSON puro) + export/import en Ajustes vía FileProvider/OpenDocument.
+- **Solo hay ACCEPT y WARN.** WARN = rechazo pasivo: se muestra en HUD, NUNCA se pulsa la X.
+  `ActionExecutor.clickDismissButton()` existe pero nadie lo llama. No reintroduzcas CANCEL.
+- No dupliques debounce/dedup: el servicio ya trae 3s entre eventos y 10s por misma tarifa
+  (`OfferFingerprint`).
 
-## Reglas Clave
+## Reglas de decisión (v1.2.0)
 
-1. **No romper el parser**: `OfferParser.parseFromTextNodes()` es 100% JVM puro y está cubierto por tests.
-2. **TapGeometry es universal**: nada de coordenadas absolutas ni calibración por modelo; todo es
-   relativo a `RectSpec` o proporciones de pantalla.
-3. **Normaliza antes de comparar**: cualquier match de texto (lista negra, botones) pasa por
-   `TextNormalizer.normalize()` para ignorar mayúsculas, tildes y símbolos.
-4. **Deadhead no es distancia**: un viaje largo no se rechaza por km; solo se reporta cuando la
-   rentabilidad final (con vuelta vacía incluida) cae bajo los mínimos. Umbral configurable
-   (`FilterRulesEntity.deadheadThresholdKm`, default 8.0).
-5. **Una sola métrica principal decide**: `RuleEngine` usa `FilterRulesEntity.primaryMetric`
-   (`PER_HOUR` default / `PER_KM`, ver `ProfitMetric`). La otra métrica se **ignora**. `minFare`
-   y `minNetProfit` son guardas absolutas opcionales (default 0 = off). No volver a evaluar
-   `$/km` y `$/hr` juntos: era contradictorio.
-6. **No dupliques debounce/dedup**: el servicio ya trae 3s entre eventos y 10s por misma tarifa.
-7. **Foreground services**: `MonitorForegroundService` y `FloatingWindowService` lo son para no ser
-   matados bajo memoria. El WakeLock se adquiere con timeout (4h) y se renueva cada 55 min.
-8. **Lint `MissingPermission`**: el detector no sigue métodos wrapper (p. ej. `hasLocationPermission()`).
-   Si usas una API con permiso, haz el `checkSelfPermission` inline o envuélvelo en try/catch.
+- **Una sola métrica económica decide: ganancia neta por km** (`FilterRulesEntity.minProfitPerKm`).
+  La tarifa de la tarjeta ya viene neta (Uber descuenta su comisión), así que NO hay métricas por
+  hora, comisión de plataforma ni vuelta vacía. No vuelvas a evaluar `$/km` y `$/hora` juntos.
+- `0` = filtro desactivado. Filtros actuales: `minFare`, `minProfitPerKm`, pickup (`pickup_measure`
+  MIN/KM + `pickupMax`), viaje (`trip_measure` + `tripMax`), rating (`minPassengerRating`,
+  `rejectOnUnknownRating`), `autoAcceptEnabled`.
+- **Normaliza antes de comparar**: todo match de texto (botones del parser, motivos) pasa por
+  `TextNormalizer.normalize()` (ignora mayúsculas, tildes, símbolos).
+- `TapGeometry`/`ActionExecutor` son universales: nada de coordenadas absolutas ni calibración por
+  modelo; todo es relativo a `RectSpec` o proporciones de pantalla. `HumanTapTiming` añade retardo
+  gaussiano + jitter opt-in (`humanTapsEnabled`).
 
-## Mapa (OSMDroid — sin API key)
+## Feature geográfica (la única "zona" que queda)
 
-- `BlacklistMapActivity` usa `org.osmdroid.views.MapView` con id `map_fragment` (**no es un
-  `SupportMapFragment`**) y tile source `TileSourceFactory.MAPNIK` en **tema claro**.
-- Ubicación con `FusedLocationProviderClient` (`play-services-location`). Nunca se usa el SDK de Google Maps.
-- `NominatimGeocoder` (geocodificación inversa) es online y respeta la política de uso:
-  rate limit 1100 ms, grid de 200 m, máx. 40 puntos por polígono, User-Agent obligatorio.
-- API de osmdroid 6.1.20 (aprendida a golpes): `Polygon` usa `strokeColor`/`strokeWidth`
-  (no `outline*`); **no existen** `IconFactory` ni `Marker.relatedObject` (asocia zona↔marker con un `Map`).
+- Control opt-in: `geoCheckEnabled` + `geoApiKey` (token de LocationIQ que el conductor pega en
+  Ajustes). **La API key se guarda en Room y jamás se commitea.**
+- Las zonas son `assets/zonas-permitidasv3.geojson` (GeoJSON `[lng, lat]`, Polygon/MultiPolygon,
+  con agujeros). Se parsean una vez con `GeoJsonZones`.
+- **Fail-open**: sin key, sin red, sin geocode o sin GeoJSON válido, el filtro se OMITE (WARN
+  "no confirmada"). La geolocalización nunca bloquea ni auto-acepta por sí sola.
 
-## Room DB y Migraciones
+## Room y migraciones
 
-- `AppDatabase` en **versión 9**. Migraciones explícitas `MIGRATION_5_6`, `MIGRATION_6_7`,
-  `MIGRATION_7_8` (crea `app_settings`) y `MIGRATION_8_9` (añade `filter_rules.primary_metric`).
-  **No hay `fallbackToDestructiveMigration()`** (la nota antigua era falsa). Al cambiar el esquema:
-  sube la versión y añade un `Migration` con DDL manual.
-- `exportSchema = false` (aunque `room.schemaLocation` está declarado): `app/schemas/` solo contiene
-  un `1.json` obsoleto; no confíes en schemas exportados.
-- `blacklist_zone` es v2: polígonos en `polygon_json` + keywords en `extracted_keywords_json`.
-  Las columnas legacy (`latitude`/`longitude`/`radius_meters`) se convierten a cuadrado al leer vía
-  `PolygonGeometry.circleToSquarePolygon()`; la comparación usa point-in-polygon + texto normalizado.
+- `AppDatabase` en **versión 15**, `exportSchema = false`. Migraciones explícitas
+  `MIGRATION_5_6`…`MIGRATION_14_15` en el companion object de `AppDatabase`.
+- **No hay `fallbackToDestructiveMigration()`.** Al cambiar cualquier esquema: sube `version`,
+  añade un `Migration` con DDL manual y regístralo en `DatabaseModule.provideDatabase().addMigrations(...)`.
+- Room valida el esquema EXACTO (columna por columna). Las migraciones 13→14 y 14→15 dejan
+  constancia de cómo se eliminaron tablas/columnas; lee ahí antes de tocar el esquema.
+- Tablas actuales: `vehicle_config` (singleton, costos) · `filter_rules` (singleton, reglas) ·
+  `app_settings` (singleton, toggles).
 
-## Tablas
+## Simulador de ofertas (solo debug)
 
-- `trip_log`: historial de ofertas evaluadas (métricas económicas + decisión)
-- `vehicle_config`: singleton (`id = 1`) con costo/km, consumo, precio combustible
-- `filter_rules`: singleton (`id = 1`) con filtros y `deadhead_threshold_km`
-- `blacklist_entry`: keywords de texto
-- `blacklist_zone`: zonas (polígonos) con keywords extraídas
-- `app_settings`: singleton (`id = 1`) con toggles (dry-run, auto-arranque, notificaciones, voz, IA $/km)
+`SimulateOfferReceiver` (source set `debug`) inyecta una tarjeta en el pipeline real:
 
-## Archivos Críticos
+```bash
+adb shell am broadcast -n com.ubermax.app/com.ubermax.app.debug.SimulateOfferReceiver \
+  -a com.ubermax.app.debug.SIMULATE_OFFER \
+  --es fare '$4.50' --es rating '4.92' --es trips '(120)' \
+  --es pickup 'A 3 min (1.2 km)' --es pickupAddress 'Heiraway, Oscar Wilde' \
+  --es trip 'Viaje: 9 min (3.2 km)' --es dest 'Av. Condor, Ingapirca'
+```
+
+Mínimo para una tarjeta válida: `fare`, `pickup` y `trip` (con patrones min/km), porque el parser
+rechaza tarjetas sin tarifa y sin distancias.
+
+## Operación, release y versionado
+
+- `MonitorForegroundService` y `FloatingWindowService` son foreground (`specialUse`) para no ser
+  matados. `MonitorForegroundService` adquiere WakeLock con timeout 4h y lo renueva cada 55 min;
+  degrada con gracia en ROMs agresivas.
+- Versiones: `versionCode` y `versionName` (SemVer) en `app/build.gradle.kts`. Cada release se
+  etiqueta `v<versionName>` → `.github/workflows/release.yml` corre tests+lint, compila
+  `assembleRelease` y adjunta el APK. Cambios en `CHANGELOG.md` (español, formato Keep a Changelog).
+- **Keystore intencionalmente commiteado**: `keystore/ubermax-release.jks` + `keystore/keystore.properties`
+  están versionados a propósito (builds reproducibles sin secrets de CI; repo privado, solo el `.jks`
+  se permite vía .gitignore). No los "arregles" ni los elimines, y no commitees la API key de LocationIQ.
+- `local.properties` (con `sdk.dir`) y `.vscode/` están gitignoreados; no los subas.
+
+## Archivos críticos
 
 | Archivo | Rol |
 |---------|-----|
-| `accessibility/OfferParser.kt` | Extrae datos de la UI de Uber (corazón del sistema) |
-| `accessibility/ActionExecutor.kt` | Taps sobre la UI de Uber (cascade de 4 estrategias) |
-| `accessibility/TapGeometry.kt` | Geometría pura de toque (100% JVM) |
-| `domain/rules/RuleEngine.kt` | Reglas de 3 niveles (ACCEPT/WARN/CANCEL) + blacklist |
-| `domain/usecase/EvaluateOfferUseCase.kt` | Cálculo económico (fuel, net profit, deadhead) |
-| `domain/geometry/PolygonGeometry.kt` | Point-in-polygon, área, círculo→polígono (100% JVM) |
-| `domain/ai/SmartAdvisor.kt` | IA local basada en historial (usa `TripHistorySource`) |
-| `data/geocoding/NominatimGeocoder.kt` | Reverse geocoding → keywords de zona |
-| `service/UberAccessibilityService.kt` | Orquestador principal del pipeline |
-| `service/MonitorForegroundService.kt` | Foreground service + WakeLock renovado |
-| `service/FloatingWindowService.kt` | HUD flotante con auto-colapso |
-| `service/VoiceCommandService.kt` | SpeechRecognizer (opt-in) → `VoiceCommandBus` |
-| `service/BootReceiver.kt` / `CarConnectionReceiver.kt` | Auto-arranque por reinicio / Bluetooth |
-| `util/TextNormalizer.kt` | Normalización de texto para matches robustos |
-| `util/Logs.kt` | Wrapper de log seguro para tests JVM |
-| `util/DecisionNotifier.kt` | Notificación heads-up + vibración/sonido por decisión |
-| `util/ConfigBackupManager.kt` | Backup/restore de config en JSON puro |
-| `util/PermissionStatus.kt` | Checklist puro de permisos (onboarding) |
-| `domain/model/HudReasonFormatter.kt` | Motivo del HUD + abreviación de destino (puro) |
-| `domain/model/VoiceCommandParser.kt` | Parser puro de comandos de voz |
-
-## Build / Toolchain
-
-- JDK 17, AGP 8.5.1, Kotlin 1.9.24, KSP (no kapt) para Room y Hilt, Room 2.6.1, Hilt 2.51.1,
-  OSMDroid 6.1.20. Versionado en `gradle/libs.versions.toml`.
-- `local.properties` (contiene `sdk.dir`) está gitignoreado; no lo subas.
-- `AndroidManifest` declara `android:usesCleartextTraffic="true"` y `foregroundServiceType="specialUse"`.
+| `accessibility/OfferParser.kt` | Extrae datos de la tarjeta de Uber (corazón; 100% JVM vía `parseFromTextNodes`) |
+| `accessibility/ActionExecutor.kt` | Taps (cascada de estrategias, verificación post-tap) |
+| `domain/rules/RuleEngine.kt` | Decisiones ACCEPT/WARN |
+| `domain/usecase/EvaluateOfferUseCase.kt` | Cálculo económico ($/km) |
+| `domain/geo/GeoJsonZones.kt` | Zonas permitidas del conductor (JVM puro) |
+| `data/geocoding/LocationIqGeocoder.kt` | Forward geocoding LocationIQ (fail-open, timeouts 1.5s) |
+| `data/db/AppDatabase.kt` | Esquema + historial de migraciones (v5→v15) |
+| `service/UberAccessibilityService.kt` | Orquestador del pipeline |
+| `util/TextNormalizer.kt` / `util/Logs.kt` | Normalización / logging seguro para tests |
+| `util/ConfigBackupManager.kt` | Backup JSON `FORMAT_VERSION=2`; ignora bloques de features eliminadas |

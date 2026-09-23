@@ -24,7 +24,6 @@ class HudReasonFormatterTest {
         fuelCost = 1.2,
         netProfit = 5.0,
         profitPerKm = 0.6,
-        profitPerHour = 13.0,
         totalKm = 7.0
     )
 
@@ -34,11 +33,6 @@ class HudReasonFormatterTest {
     @Test
     fun `accept siempre muestra el motivo de aceptacion`() {
         assertEquals(HudReason.Accepted, HudReasonFormatter.mainReason(decision(Action.ACCEPT)))
-    }
-
-    @Test
-    fun `cancel siempre muestra lista negra`() {
-        assertEquals(HudReason.Blacklist, HudReasonFormatter.mainReason(decision(Action.CANCEL)))
     }
 
     @Test
@@ -55,6 +49,14 @@ class HudReasonFormatterTest {
             decision(Action.WARN, listOf("⚠️ Motivo raro"))
         )
         assertEquals(HudReason.Raw("Motivo raro"), result)
+    }
+
+    @Test
+    fun `warn por fuera del perimetro devuelve el motivo geografico`() {
+        val result = HudReasonFormatter.mainReason(
+            decision(Action.WARN, listOf("📍 Destino fuera del perímetro urbano: 13.5 km > máx 8.0 km"))
+        )
+        assertEquals(HudReason.Known(DecisionReason.OUT_OF_PERIMETER), result)
     }
 
     @Test
@@ -85,37 +87,5 @@ class HudReasonFormatterTest {
     @Test
     fun `destino corto no se modifica`() {
         assertEquals("Ficoa", HudReasonFormatter.abbreviateDestination("Ficoa"))
-    }
-
-    @Test
-    fun `aiSummary vacio sin recomendacion`() {
-        assertEquals("", HudReasonFormatter.aiSummary(decision(Action.WARN)))
-    }
-
-    @Test
-    fun `aiSummary con recomendacion y confianza incluye porcentaje`() {
-        val d = OfferDecision(
-            evaluatedOffer = evaluatedOffer(),
-            action = Action.WARN,
-            failedFilters = emptyList(),
-            aiRecommendation = "Buena elección basada en historial",
-            aiConfidence = 0.75
-        )
-        val result = HudReasonFormatter.aiSummary(d)
-        assertTrue(result.contains("Buena elección"))
-        assertTrue(result.contains("75%"))
-    }
-
-    @Test
-    fun `aiSummary con confianza cero omite el porcentaje`() {
-        val d = OfferDecision(
-            evaluatedOffer = evaluatedOffer(),
-            action = Action.ACCEPT,
-            failedFilters = emptyList(),
-            aiRecommendation = "IA: historial no disponible"
-        )
-        val result = HudReasonFormatter.aiSummary(d)
-        assertTrue(result.contains("IA: historial no disponible"))
-        assertTrue(result.contains("💡"))
     }
 }

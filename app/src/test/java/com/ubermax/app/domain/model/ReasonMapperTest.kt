@@ -15,48 +15,23 @@ class ReasonMapperTest {
     }
 
     @Test
-    fun `ganancia neta se mapea a LOW_NET`() {
-        assertEquals(DecisionReason.LOW_NET, ReasonMapper.map("Ganancia neta insuficiente"))
-    }
-
-    @Test
     fun `km bajo se mapea a LOW_PER_KM`() {
-        assertEquals(DecisionReason.LOW_PER_KM, ReasonMapper.map("❌ $/km bajo la tarifa"))
+        assertEquals(DecisionReason.LOW_PER_KM, ReasonMapper.map("📏 $/km bajo: $0.10 < mín $0.15"))
     }
 
     @Test
-    fun `por hora bajo se mapea a LOW_PER_HOUR`() {
-        assertEquals(DecisionReason.LOW_PER_HOUR, ReasonMapper.map("⚠ Solo $/hr de ganancia"))
+    fun `recogida lejos se mapea a PICKUP_TIME`() {
+        assertEquals(DecisionReason.PICKUP_TIME, ReasonMapper.map("🚙 Recogida muy lejos: 12.00 min > máx 5.00 min"))
     }
 
     @Test
-    fun `pickup lejos se mapea a PICKUP_FAR`() {
-        assertEquals(DecisionReason.PICKUP_FAR, ReasonMapper.map("Pickup lejos: 3.2 km"))
-    }
-
-    @Test
-    fun `viaje largo se mapea a TRIP_LONG`() {
-        assertEquals(DecisionReason.TRIP_LONG, ReasonMapper.map("Viaje largo: 40 km"))
-    }
-
-    @Test
-    fun `tiempo largo se mapea a TRIP_LONG`() {
-        assertEquals(DecisionReason.TRIP_LONG, ReasonMapper.map("Tiempo largo: 90 min"))
+    fun `recorrido excede se mapea a TRIP_DISTANCE`() {
+        assertEquals(DecisionReason.TRIP_DISTANCE, ReasonMapper.map("🛣️ Recorrido excede el máximo: 18.00 km > máx 12.00 km"))
     }
 
     @Test
     fun `rating bajo se mapea a LOW_RATING`() {
-        assertEquals(DecisionReason.LOW_RATING, ReasonMapper.map("Rating bajo: 4.2"))
-    }
-
-    @Test
-    fun `vuelta vacia se mapea a DEADHEAD`() {
-        assertEquals(DecisionReason.DEADHEAD, ReasonMapper.map("Vuelta vacía: 12 km"))
-    }
-
-    @Test
-    fun `lista negra se mapea a BLACKLIST`() {
-        assertEquals(DecisionReason.BLACKLIST, ReasonMapper.map("LISTA NEGRA: Ficoa"))
+        assertEquals(DecisionReason.LOW_RATING, ReasonMapper.map("⭐ Rating bajo: 4.2"))
     }
 
     @Test
@@ -70,7 +45,35 @@ class ReasonMapperTest {
     }
 
     @Test
-    fun `texto vacio o sin emojis devuelve null`() {
+    fun `fuera del perimetro se mapea a OUT_OF_PERIMETER`() {
+        assertEquals(
+            DecisionReason.OUT_OF_PERIMETER,
+            ReasonMapper.map("Destino fuera del perímetro urbano: 13.5 km > máx 8.0 km")
+        )
+    }
+
+    @Test
+    fun `recogida fuera de la zona permitida se mapea a OUT_OF_PERIMETER`() {
+        assertEquals(
+            DecisionReason.OUT_OF_PERIMETER,
+            ReasonMapper.map("🚙 Recogida fuera de la zona permitida")
+        )
+    }
+
+    @Test
+    fun `ubicacion no confirmada en la zona se mapea a OUT_OF_PERIMETER`() {
+        assertEquals(
+            DecisionReason.OUT_OF_PERIMETER,
+            ReasonMapper.map("Destino no confirmado dentro de la zona permitida")
+        )
+        assertEquals(
+            DecisionReason.OUT_OF_PERIMETER,
+            ReasonMapper.map("Recogida no confirmada dentro de la zona permitida")
+        )
+    }
+
+    @Test
+    fun `texto vacio devuelve null`() {
         assertNull(ReasonMapper.map(""))
         assertNull(ReasonMapper.map("  "))
     }

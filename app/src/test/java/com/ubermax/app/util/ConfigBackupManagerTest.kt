@@ -1,8 +1,6 @@
 package com.ubermax.app.util
 
 import com.ubermax.app.data.db.entity.AppSettingsEntity
-import com.ubermax.app.data.db.entity.BlacklistEntryEntity
-import com.ubermax.app.data.db.entity.BlacklistZoneEntity
 import com.ubermax.app.data.db.entity.FilterRulesEntity
 import com.ubermax.app.data.db.entity.VehicleConfigEntity
 import org.junit.Assert.assertEquals
@@ -10,7 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tests JVM puros del backup de configuración JSON (round-trip, versiones y errores).
+ * Tests JVM puros del backup de configuración JSON (round-trip, versiones,
+ * errores y tolerancia a bloques de features eliminadas).
  */
 class ConfigBackupManagerTest {
 
@@ -27,44 +26,20 @@ class ConfigBackupManagerTest {
         ),
         filter = FilterRulesEntity(
             minFare = 2.0,
-            primaryMetric = "PER_KM",
-            minNetProfit = 1.0,
             minProfitPerKm = 0.2,
-            minProfitPerHour = 4.0,
-            maxPickupKm = 6.0,
-            maxTripKm = 40.0,
-            maxTotalMinutes = 75,
+            pickupMeasure = "KM",
+            pickupMax = 3.5,
+            tripMeasure = "MIN",
+            tripMax = 45.0,
             minPassengerRating = 4.6,
-            maxPickupTripRatio = 0.8,
-            blacklistEnabled = false,
-            autoAcceptEnabled = true,
-            aiEnabled = false,
-            deadheadThresholdKm = 10.0
-        ),
-        blacklist = listOf(
-            BlacklistEntryEntity(keyword = "Ficoa", type = "SECTOR", reason = "mala zona"),
-            BlacklistEntryEntity(keyword = "Terminal", type = "ZONE")
-        ),
-        zones = listOf(
-            BlacklistZoneEntity(
-                name = "Centro",
-                polygonJson = "[[1.0,2.0],[3.0,4.0],[5.0,6.0]]",
-                latitude = -1.24,
-                longitude = -78.62,
-                radiusMeters = 500.0,
-                extractedKeywordsJson = "[\"Centro\"]",
-                createdAt = 123456789L
-            )
+            rejectOnUnknownRating = true,
+            autoAcceptEnabled = true
         ),
         settings = AppSettingsEntity(
-            dryRunEnabled = true,
-            autoStartOnBoot = true,
-            notifyDecisions = false,
-            vibrateOnDecision = false,
-            soundOnDecision = true,
-            voiceControlEnabled = true,
-            autoStartOnCarBt = true,
-            aiGoodProfitPerKm = 0.4
+            voiceAnnounceEnabled = false,
+            humanTapsEnabled = false,
+            geoCheckEnabled = true,
+            geoApiKey = "pk.examplekey"
         )
     )
 
@@ -75,18 +50,16 @@ class ConfigBackupManagerTest {
         assertEquals(sampleBackup().vehicle, parsed.vehicle)
         assertEquals(sampleBackup().filter, parsed.filter)
         assertEquals(sampleBackup().settings, parsed.settings)
+    }
 
-        assertEquals(2, parsed.blacklist.size)
-        assertEquals("Ficoa", parsed.blacklist[0].keyword)
-        assertEquals("SECTOR", parsed.blacklist[0].type)
-        assertEquals("mala zona", parsed.blacklist[0].reason)
+    @Test
+    fun `round trip conserva los toggles operativos`() {
+        val parsed = ConfigBackupManager.fromJson(ConfigBackupManager.toJson(sampleBackup()))
 
-        assertEquals(1, parsed.zones.size)
-        val zone = parsed.zones[0]
-        assertEquals("Centro", zone.name)
-        assertEquals("[[1.0,2.0],[3.0,4.0],[5.0,6.0]]", zone.polygonJson)
-        assertEquals(500.0, zone.radiusMeters, 0.0)
-        assertEquals(123456789L, zone.createdAt)
+        assertEquals(false, parsed.settings.voiceAnnounceEnabled)
+        assertEquals(false, parsed.settings.humanTapsEnabled)
+        assertEquals(true, parsed.settings.geoCheckEnabled)
+        assertEquals("pk.examplekey", parsed.settings.geoApiKey)
     }
 
     @Test
@@ -112,16 +85,44 @@ class ConfigBackupManagerTest {
     @Test
     fun `campos faltantes usan defaults`() {
         val parsed = ConfigBackupManager.fromJson("""{"version":1}""")
-        assertEquals(VehicleConfigEntity(), parsed.vehicle)
-        assertEquals(FilterRulesEntity(), parsed.filter)
+        assertEquals(VehicleConfigEntity(engineIdleCostPerHour = 0.20), parsed.vehicle)
+        assertEquals(FilterRulesEntity(minProfitPerKm = 0.15), parsed.filter)
         assertEquals(AppSettingsEntity(), parsed.settings)
-        assertTrue(parsed.blacklist.isEmpty())
-        assertTrue(parsed.zones.isEmpty())
     }
 
     @Test
-    fun `backup antiguo sin primaryMetric cae en por hora`() {
-        val parsed = ConfigBackupManager.fromJson("""{"version":1,"filter":{"minFare":1.5}}""")
-        assertEquals("PER_HOUR", parsed.filter.primaryMetric)
+    fun `backup antiguo con bloques eliminados se importa ignorandolos`() {
+        val json = """
+            {"version":1,
+             "filter":{"minFare":1.5,"primaryMetric":"PER_HOUR","minProfitPerHour":4.0,
+                       "blacklistEnabled":true,"aiEnabled":true},
+             "blacklist":[{"keyword":"Ficoa","type":"SECTOR","reason":"mala zona"}],
+             "zones":[{"name":"Centro","polygonJson":"[[1,2]]","latitude":-1.24}],
+             "settings":{"dryRunEnabled":true,"autoStartOnBoot":true,"notifyDecisions":false,
+                         "voiceControlEnabled":true,"geoRadiusKm":12.0},
+             "vehicle":{"platformCommissionPercent":9.0}}
+        """.trimIndent()
+        val parsed = ConfigBackupManager.fromJson(json)
+
+        assertEquals(1.5, parsed.filter.minFare, 0.001)
+        // el backup guardaba primaryMetric/hora, pero la entidad actual solo conserva lo vigente:
+        assertEquals(0.15, parsed.filter.minProfitPerKm, 0.001)
+        assertEquals(AppSettingsEntity(geoCheckEnabled = false), parsed.settings)
+        assertEquals(VehicleConfigEntity(), parsed.vehicle)
+    }
+
+    @Test
+    fun `backup con campos vigentes sobreescribe los defaults`() {
+        val json = """
+            {"version":2,
+             "filter":{"minProfitPerKm":0.35},
+             "settings":{"voiceAnnounceEnabled":true,"geoCheckEnabled":true,"geoApiKey":"pk.x"}}
+        """.trimIndent()
+        val parsed = ConfigBackupManager.fromJson(json)
+
+        assertEquals(0.35, parsed.filter.minProfitPerKm, 0.001)
+        assertTrue(parsed.settings.voiceAnnounceEnabled)
+        assertTrue(parsed.settings.geoCheckEnabled)
+        assertEquals("pk.x", parsed.settings.geoApiKey)
     }
 }

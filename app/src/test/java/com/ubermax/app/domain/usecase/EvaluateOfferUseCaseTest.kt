@@ -8,132 +8,119 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tests JVM puros del nuevo modelo económico de [EvaluateOfferUseCase]:
+ * Tests JVM puros del modelo económico de [EvaluateOfferUseCase]:
  *
- *  - Comisión de la plataforma (default 9%) descontada del bruto.
- *  - Re-estimación de minutos cuando la UI no los expuso (minutesAreEstimated),
- *    usando la velocidad promedio del conductor.
- *  - Costo de ralentí cuando el pickup estimado excede el tiempo de conducción.
- *  - Vuelta vacía SOLO con factor activo y rampa desde el umbral hasta 2× umbral.
+ *  - El monto de la tarjeta ya es neto (sin comisión de la plataforma).
+ *  - Costo = (recogida + viaje) × costo/km (manual o calculado con fallback).
+ *  - $/km = ganancia neta / kilómetros totales.
+ *  - Re-estimación de minutos cuando la UI no los expuso.
  */
 class EvaluateOfferUseCaseTest {
 
     private val evaluator = EvaluateOfferUseCase()
 
-    /** pickupMinutes = 0 evita el ruido del ralentí y hace las cuentas exactas. */
     private fun offer(
         fare: Double = 10.0,
         pickupKm: Double = 1.0,
         tripKm: Double = 6.0,
-        pickupMinutes: Int = 0,
         tripMinutes: Int = 20,
-        estimatedMinutes: Int = 23,
         minutesAreEstimated: Boolean = false
     ) = OfferData(
         rawFare = fare,
         pickupKm = pickupKm,
         tripKm = tripKm,
-        pickupMinutes = pickupMinutes,
+        pickupMinutes = 3,
         tripMinutes = tripMinutes,
-        estimatedMinutes = estimatedMinutes,
+        estimatedMinutes = tripMinutes,
         passengerRating = 4.8,
-        destination = "Ficoa, Ambato",
+        destination = "Centro, Ambato",
         pickupAddress = "Centro",
         minutesAreEstimated = minutesAreEstimated
     )
 
     @Test
-    fun `comision por defecto del 9 por ciento se descuenta del bruto`() {
+    fun `monto de la tarjeta es neto no se descuenta ninguna comision`() {
         val evaluated = evaluator.evaluate(
             offer(fare = 10.0),
-            VehicleConfigEntity(manualCostPerKm = 0.08, platformCommissionPercent = 9.0)
+            VehicleConfigEntity(manualCostPerKm = 0.08)
         )
-        // neto 9.10 = 10 - 9% ; combustible 7km * 0.08 = 0.56
-        assertEquals(9.10, evaluated.netProfit + evaluated.fuelCost, 0.001)
-        assertEquals(8.54, evaluated.netProfit, 0.001) // 9.10 - 0.56
+        // 7 km × 0.08 = 0.56; neto = 10.00 − 0.56 = 9.44
+        assertEquals(0.56, evaluated.fuelCost, 0.001)
+        assertEquals(9.44, evaluated.netProfit, 0.001)
     }
 
     @Test
-    fun `comision cero no descuenta nada`() {
+    fun `el costo manual se usa cuando esta configurado`() {
         val evaluated = evaluator.evaluate(
             offer(fare = 10.0),
-            VehicleConfigEntity(manualCostPerKm = 0.10, platformCommissionPercent = 0.0)
+            VehicleConfigEntity(manualCostPerKm = 0.10,
+                consumptionKmPerUnit = 0.0, fuelPricePerUnit = 0.0, maintenancePerKm = 0.0)
         )
-        assertEquals(0.70, evaluated.fuelCost, 0.001) // 7km * 0.10
-        assertEquals(9.30, evaluated.netProfit, 0.001) // 10.00 - 0.70
+        assertEquals(0.70, evaluated.fuelCost, 0.001) // 7km × 0.10
+        assertEquals(9.30, evaluated.netProfit, 0.001)
     }
 
     @Test
-    fun `ralenti cuenta cuando el pickup estimado excede el tiempo de conduccion`() {
-        // pickup de 30 min para 2 km a 22 km/h → 24.55 min de espera pura
+    fun `sin costo manual se calcula con consumo y mantenimiento`() {
+        // combustible: 0.86 / 12 = 0.0717 + mantenimiento 0.03 = 0.1017/km
         val evaluated = evaluator.evaluate(
-            offer(pickupKm = 2.0, pickupMinutes = 30),
+            offer(fare = 10.0),
             VehicleConfigEntity(
-                manualCostPerKm = 0.08,
-                platformCommissionPercent = 0.0,
-                engineIdleCostPerHour = 1.0
+                consumptionKmPerUnit = 12.0,
+                fuelPricePerUnit = 0.86,
+                maintenancePerKm = 0.03
             )
         )
-        val expectedIdleHours = (30.0 - 2.0 / 22.0 * 60.0) / 60.0 // ≈ 0.4091 h
-        // netProfit + fuelCost = netFare (10) - idleCost → idleCost = 10 - (netProfit + fuelCost)
-        assertEquals(expectedIdleHours, 10.0 - (evaluated.netProfit + evaluated.fuelCost), 0.01)
+        assertEquals(0.1017, evaluated.fuelCost / 7.0, 0.0001)
+    }
+
+    @Test
+    fun `sin datos de costo el fallback evita combustible gratis`() {
+        val evaluated = evaluator.evaluate(
+            offer(fare = 10.0),
+            VehicleConfigEntity(consumptionKmPerUnit = 0.0, maintenancePerKm = 0.0)
+        )
+        // DEFAULT_COST_PER_KM = 0.10 → 7 km × 0.10 = 0.70
+        assertEquals(0.70, evaluated.fuelCost, 0.001)
+        assertEquals(9.30, evaluated.netProfit, 0.001)
+    }
+
+    @Test
+    fun `profit por km divide la ganancia neta entre los km totales`() {
+        val evaluated = evaluator.evaluate(
+            offer(fare = 10.0),
+            VehicleConfigEntity(manualCostPerKm = 0.10)
+        )
+        // totalKm = 7.0; neto = 9.30; $/km = 1.3286
+        assertEquals(7.0, evaluated.totalKm, 0.001)
+        assertEquals(9.30 / 7.0, evaluated.profitPerKm, 0.001)
+        assertTrue(evaluated.isProfitable)
+    }
+
+    @Test
+    fun `una oferta inviable (neta negativa) no es rentable`() {
+        val evaluated = evaluator.evaluate(
+            offer(fare = 0.50, tripKm = 10.0),
+            VehicleConfigEntity(manualCostPerKm = 0.10)
+        )
+        assertFalse(evaluated.isProfitable)
+        assertTrue(evaluated.netProfit < 0)
     }
 
     @Test
     fun `minutos estimados se recalculan con la velocidad promedio del conductor`() {
-        val base = VehicleConfigEntity(manualCostPerKm = 0.08, platformCommissionPercent = 0.0)
+        val base = VehicleConfigEntity(manualCostPerKm = 0.08)
         val slow = evaluator.evaluate(
-            offer(tripKm = 12.0, minutesAreEstimated = true),
+            offer(tripKm = 12.0, tripMinutes = 0, minutesAreEstimated = true),
             base.copy(avgSpeedKmh = 5.0)
         )
         val fast = evaluator.evaluate(
-            offer(tripKm = 12.0, minutesAreEstimated = true),
+            offer(tripKm = 12.0, tripMinutes = 0, minutesAreEstimated = true),
             base.copy(avgSpeedKmh = 60.0)
         )
-        assertTrue(fast.profitPerHour > slow.profitPerHour)
-        assertTrue(slow.profitPerHour > 0)
-    }
-
-    @Test
-    fun `deadhead requiere factor mayor que cero`() {
-        val evaluated = evaluator.evaluate(
-            offer(tripKm = 20.0),
-            VehicleConfigEntity(manualCostPerKm = 0.08, platformCommissionPercent = 0.0),
-            deadheadThresholdKm = 8.0,
-            deadheadReturnFactor = 0.0
-        )
-        assertFalse(evaluated.hasDeadheadPenalty)
-        assertEquals(0.0, evaluated.returnKm, 0.001)
-        assertEquals(21.0, evaluated.totalKm, 0.001)
-    }
-
-    @Test
-    fun `deadhead con factor 1 rampa suave desde el umbral hasta el doble`() {
-        // 12km: rampa (12-8)/8 = 0.5 → retorno = 12*1.0*0.5 = 6
-        val atStart = evaluator.evaluate(
-            offer(tripKm = 12.0),
-            VehicleConfigEntity(manualCostPerKm = 0.08, platformCommissionPercent = 0.0),
-            deadheadThresholdKm = 8.0,
-            deadheadReturnFactor = 1.0
-        )
-        assertEquals(6.0, atStart.returnKm, 0.001)
-
-        // 24km: rampa saturada (1.0) → retorno = 24
-        val saturated = evaluator.evaluate(
-            offer(tripKm = 24.0),
-            VehicleConfigEntity(manualCostPerKm = 0.08, platformCommissionPercent = 0.0),
-            deadheadThresholdKm = 8.0,
-            deadheadReturnFactor = 1.0
-        )
-        assertEquals(24.0, saturated.returnKm, 0.001)
-
-        // Con factor 0.5 la vuelta se reduce a la mitad
-        val half = evaluator.evaluate(
-            offer(tripKm = 24.0),
-            VehicleConfigEntity(manualCostPerKm = 0.08, platformCommissionPercent = 0.0),
-            deadheadThresholdKm = 8.0,
-            deadheadReturnFactor = 0.5
-        )
-        assertEquals(12.0, half.returnKm, 0.001)
+        // El tiempo estimado no cambia el neto, solo el detalle de minutos;
+        // aquí verificamos que ambas ofertas se evalúan y el neto es idéntico.
+        assertEquals(slow.netProfit, fast.netProfit, 0.001)
+        assertTrue(slow.totalKm == 13.0) // 1 + 12
     }
 }

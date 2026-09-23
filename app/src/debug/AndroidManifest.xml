@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- SOLO DEBUG: receptor para inyectar ofertas simuladas en el pipeline real -->
     <application>
-        <!-- Receptores de pruebas SOLO DEBUG: no existen en release -->
         <receiver
-            android:name=".service.SimulateOfferReceiver"
+            android:name="com.ubermax.app.debug.SimulateOfferReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.ubermax.app.SIMULATE_OFFER" />
+                <action android:name="com.ubermax.app.debug.SIMULATE_OFFER" />
             </intent-filter>
         </receiver>
     </application>
-
 </manifest>

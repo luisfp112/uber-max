@@ -4,67 +4,15 @@
     <string name="accessibility_service_description">UberMax analiza las ofertas de viaje de Uber Driver para calcular rentabilidad neta y asistir en la toma de decisiones.</string>
 
     <!-- Dashboard -->
-    <string name="dashboard_title">Panel de Control</string>
-    <string name="today_earnings">Ganancias Hoy</string>
-    <string name="total_offers">Ofertas Recibidas</string>
-    <string name="accepted_offers">Aceptadas</string>
-    <string name="ignored_offers">Ignoradas</string>
-    <string name="avg_profit_km">Ganancia/Km Promedio</string>
-    <string name="avg_profit_hour">Ganancia/Hora Promedio</string>
-    <string name="best_zones">Mejores Zonas</string>
-    <string name="best_hours">Mejores Horarios</string>
 
     <!-- Settings -->
-    <string name="settings_title">Configuración</string>
-    <string name="vehicle_config">Configuración del Vehículo</string>
-    <string name="vehicle_name">Nombre del Vehículo</string>
-    <string name="cost_per_km">Costo por Km (combustible)</string>
-    <string name="avg_speed">Velocidad Promedio (km/h)</string>
-    <string name="idle_cost_hour">Costo Motor Ralentí (/hora)</string>
-    <string name="filter_rules">Reglas de Filtrado</string>
-    <string name="min_profit_km">Ganancia Mínima por Km</string>
-    <string name="min_profit_hour">Ganancia Mínima por Hora</string>
-    <string name="min_passenger_rating">Calificación Mínima Pasajero</string>
-    <string name="blacklist_enabled">Lista Negra Activa</string>
-    <string name="auto_accept_enabled">Auto-Aceptar Activo</string>
-    <string name="manage_blacklist">Administrar Lista Negra</string>
+    <string name="settings_min_profit_per_km">Ganancia mínima neta $/km (métrica que decide)</string>
     <string name="save">Guardar</string>
     <string name="saved_successfully">Configuración guardada</string>
 
     <!-- Ayuda contextual de filtros -->
-    <string name="help_max_pickup_title">Distancia máxima de recogida</string>
-    <string name="help_max_pickup_body">¿A qué distancia máxima (en km) puede estar el pasajero desde tu posición para que Uber Max acepte el viaje?\n\nUnidad: kilómetros (km). Si el pasajero queda a más distancia de la que establezcas, el viaje será rechazado.\n\nEjemplo: si pones 3, un pasajero a 4 km de ti será rechazado; uno a 2 km será aceptado.</string>
-    <string name="help_max_trip_title">Distancia máxima del viaje</string>
-    <string name="help_max_trip_body">¿Cuál es la distancia máxima (en km) que estás dispuesto a recorrer durante el viaje?\n\nUnidad: kilómetros (km). Los viajes más largos que este valor serán rechazados.\n\nEjemplo: si pones 25, un viaje de 40 km será rechazado; uno de 15 km será aceptado.</string>
-    <string name="help_rating_title">Rating mínimo del pasajero</string>
-    <string name="help_rating_body">¿Cuál es la calificación mínima (en estrellas, de 1 a 5) que debe tener el pasajero?\n\nUnidad: estrellas (0.0 a 5.0). Usa 0 para desactivar este filtro.\n\nEjemplo: si pones 4.5, aceptarás pasajeros con 4.5★ o más; los de 4.0★ serán rechazados.</string>
-    <string name="help_net_profit_title">Ganancia mínima por viaje</string>
-    <string name="help_net_profit_body">Define cuánto dinero (en USD) debe generar un viaje para que Uber Max lo considere rentable.\n\nEste valor ya resta el costo del combustible y el mantenimiento de tu vehículo.\n\nUnidad: dólares ($).\n\nEjemplo: si estableces $5, cualquier viaje que genere menos de $5 de ganancia neta será rechazado.</string>
-    <string name="help_profit_km_title">Ganancia neta mínima por km</string>
-    <string name="help_profit_km_body">Define cuánta ganancia neta (en USD) debe dejar cada kilómetro recorrido.\n\nUnidad: $/km.\n\nEjemplo: si pones $0.20/km, un viaje que deje $0.12/km será rechazado; uno que deje $0.30/km será aceptado.</string>
-
     <!-- Blacklist -->
-    <string name="add_blacklist_entry">Agregar palabra clave</string>
-    <string name="keyword">Palabra clave</string>
-    <string name="type_sector">Sector</string>
-    <string name="type_street">Calle</string>
-    <string name="type_zone">Zona</string>
-    <string name="reason">Razón</string>
-    <string name="delete">Eliminar</string>
-
     <!-- HUD -->
-    <string name="hud_net_profit">Ganancia Neta</string>
-    <string name="hud_fuel_cost">Costo Combustible</string>
-    <string name="hud_profit_km">$/Km</string>
-    <string name="hud_profit_hour">$/Hora</string>
-    <string name="hud_rating">Rating</string>
-    <string name="hud_auto_accepted">AUTO-ACEPTADO</string>
-    <string name="hud_ignored">IGNORADO</string>
-    <string name="hud_waiting">ESPERANDO OFERTA</string>
-    <string name="hud_zone_good">Zona actual: buena</string>
-    <string name="hud_zone_move">Moverse a zona activa</string>
-    <string name="hud_zone_stay">Permanecer aquí</string>
-
     <!-- Service -->
     <string name="notification_channel_name">UberMax Monitor</string>
     <string name="notification_channel_description">Monitoreo activo de ofertas de Uber Driver</string>
@@ -75,35 +23,23 @@
 
     <!-- HUD — decisión y motivos -->
     <string name="hud_accepted">ACEPTADO</string>
-    <string name="hud_rejected">RECHAZADO</string>
-    <string name="hud_warned">SIN ACCIÓN — TÚ DECIDES</string>
-    <string name="hud_no_action">SIN ACCIÓN</string>
+    <string name="hud_warned">WARN</string>
     <string name="hud_no_destination">Sin destino</string>
     <string name="hud_reason_accepted">Rentabilidad suficiente</string>
-    <string name="hud_reason_blacklist">Zona en lista negra</string>
     <string name="hud_reason_low_fare">Tarifa muy baja</string>
-    <string name="hud_reason_low_net">Ganancia neta insuficiente</string>
     <string name="hud_reason_low_per_km">Rentabilidad por km baja</string>
-    <string name="hud_reason_low_per_hour">Rentabilidad por hora baja</string>
     <string name="hud_reason_pickup_far">Recogida muy lejana</string>
+    <string name="hud_reason_pickup_time">Recogida muy lenta</string>
     <string name="hud_reason_trip_long">Viaje demasiado largo</string>
+    <string name="hud_reason_trip_distance">Recorrido muy largo</string>
+    <string name="hud_reason_out_of_perimeter">Zona prohibida — fuera del perímetro urbano</string>
     <string name="hud_reason_low_rating">Pasajero de bajo rating</string>
-    <string name="hud_reason_deadhead">Vuelta vacía larga</string>
     <string name="hud_reason_auto_accept_off">Auto-aceptación desactivada</string>
 
     <!-- General -->
     <string name="enable_accessibility">Habilitar Servicio de Accesibilidad</string>
     <string name="start_monitoring">Iniciar Monitoreo</string>
     <string name="stop_monitoring">Detener Monitoreo</string>
-    <string name="export_csv">Exportar CSV</string>
-    <string name="no_data">Sin datos disponibles</string>
-    <string name="dashboard_stats_title">Hoy</string>
-    <string name="exporting_csv">Generando CSV…</string>
-    <string name="export_empty">No hay viajes para exportar todavía</string>
-    <string name="best_hours_empty">Aún sin historial para analizar mejores horas</string>
-    <string name="best_zones_empty">Aún sin historial para analizar mejores zonas</string>
-    <string name="hour_stat_line">%1$d:00 — $%2$.2f (%3$d viajes)</string>
-    <string name="zone_stat_line">%1$s — $%2$.2f/km (%3$d viajes)</string>
 
     <!-- Onboarding de permisos -->
     <string name="onboarding_title">Configuración inicial</string>
@@ -123,60 +59,30 @@
     <string name="perm_battery_reason">Evita que el sistema detenga el monitoreo.</string>
     <string name="perm_overlay_name">Superponer sobre otras apps</string>
     <string name="perm_overlay_reason">Muestra el HUD flotante con la decisión.</string>
-    <string name="perm_location_name">Ubicación</string>
-    <string name="perm_location_reason">Centra el mapa de zonas y mejora el análisis.</string>
-    <string name="perm_microphone_name">Micrófono</string>
-    <string name="perm_microphone_reason">Habilita los comandos de voz.</string>
-    <string name="perm_bluetooth_name">Bluetooth</string>
-    <string name="perm_bluetooth_reason">Auto-arranque al conectar el auto.</string>
     <string name="onboarding_ready">Todo listo para operar</string>
     <string name="onboarding_missing_required">Faltan permisos obligatorios</string>
     <string name="onboarding_done">Permisos obligatorios concedidos</string>
 
     <!-- Ajustes: comportamiento -->
     <string name="settings_behavior_title">Comportamiento</string>
-    <string name="settings_dry_run">Modo simulación</string>
-    <string name="settings_dry_run_summary">Evalúa y muestra el HUD, pero no pulsa en Uber.</string>
-    <string name="settings_auto_start_boot">Auto-arranque al reiniciar</string>
-    <string name="settings_auto_start_boot_summary">Inicia el monitoreo tras encender el dispositivo.</string>
-    <string name="settings_notify_decisions">Notificar decisiones</string>
-    <string name="settings_notify_decisions_summary">Muestra una notificación por cada oferta evaluada.</string>
-    <string name="settings_vibrate">Vibrar al decidir</string>
-    <string name="settings_sound">Sonido al decidir</string>
-    <string name="settings_voice_control">Control por voz</string>
-    <string name="settings_voice_control_summary">Di "aceptar" o "rechazar" durante el monitoreo.</string>
-    <string name="settings_auto_start_bt">Auto-arranque por Bluetooth</string>
-    <string name="settings_auto_start_bt_summary">Inicia al conectar un dispositivo de audio del auto.</string>
-    <string name="settings_ai_good_profit_per_km">Buena ganancia por km (USD)</string>
-    <string name="settings_ai_good_profit_per_km_summary">Referencia que usa la IA para puntuar destinos.</string>
+    <string name="settings_human_taps">Taps humanizados</string>
+    <string name="settings_voice_announce">Anunciar decisiones por voz</string>
+    <!-- Geolocalización del perímetro urbano -->
+    <string name="settings_geo_title">📍 Geolocalización (perímetro)</string>
+    <string name="settings_geo_summary">Geolocaliza el destino de cada oferta (LocationIQ, sin mapa) y bloquea —WARN, nunca rechazo automático— las que salgan del radio urbano de Ambato.</string>
+    <string name="settings_geo_check">Bloquear destinos fuera del perímetro</string>
+    <string name="settings_geo_api_key">LocationIQ API key</string>
     <string name="export_config">Exportar configuración</string>
     <string name="import_config">Importar configuración</string>
     <string name="config_exported">Configuración exportada</string>
     <string name="config_imported">Configuración importada</string>
     <string name="config_import_error">No se pudo importar la configuración</string>
-    <string name="voice_notification_title">Control por voz activo</string>
-    <string name="voice_notification_text">Di "aceptar" o "rechazar" para actuar sobre la oferta</string>
+
+    <!-- Datos para entrenar la IA (futuro) -->
 
     <!-- HUD simulación -->
-    <string name="hud_simulation">SIMULACIÓN</string>
 
     <!-- Canal de notificaciones de decisión -->
-    <string name="decision_channel_name">Decisiones de UberMax</string>
-    <string name="decision_channel_description">Avisos inmediatos de cada oferta evaluada</string>
-    <string name="decision_notification_accepted">Oferta aceptada</string>
-    <string name="decision_notification_rejected">Oferta rechazada</string>
-    <string name="decision_notification_simulated">Simulación</string>
-
+        
     <!-- Historial -->
-    <string name="open_history">Historial</string>
-    <string name="history_title">Historial de ofertas</string>
-    <string name="history_empty">Aún no hay ofertas registradas</string>
-    <string name="history_chart_title">Ganancia por hora</string>
-    <string name="history_chart_empty">Sin datos para graficar</string>
-    <string name="history_filter_today">Hoy</string>
-    <string name="history_filter_7d">7 días</string>
-    <string name="history_filter_30d">30 días</string>
-    <string name="history_filter_all">Todo</string>
-    <string name="history_price_format">$%1$.2f</string>
-    <string name="history_date_format">%1$s · %2$s</string>
 </resources>

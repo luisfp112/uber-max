@@ -134,37 +134,12 @@ class OnboardingActivity : AppCompatActivity() {
                         Uri.parse("package:$packageName")
                     )
                 )
-
-            AppPermission.LOCATION ->
-                permissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                )
-
-            AppPermission.MICROPHONE ->
-                permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-
-            AppPermission.BLUETOOTH ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    permissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
-                }
         }
     }
 
     private fun snapshot(): PermissionSnapshot {
         val notifications = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             granted(Manifest.permission.POST_NOTIFICATIONS)
-        } else true
-
-        val location = granted(Manifest.permission.ACCESS_FINE_LOCATION) ||
-            granted(Manifest.permission.ACCESS_COARSE_LOCATION)
-
-        val microphone = granted(Manifest.permission.RECORD_AUDIO)
-
-        val bluetooth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            granted(Manifest.permission.BLUETOOTH_CONNECT)
         } else true
 
         val battery = try {
@@ -178,10 +153,7 @@ class OnboardingActivity : AppCompatActivity() {
             accessibility = UberAccessibilityService.isRunning,
             notifications = notifications,
             batteryOptimizationIgnored = battery,
-            overlay = Settings.canDrawOverlays(this),
-            location = location,
-            microphone = microphone,
-            bluetooth = bluetooth
+            overlay = Settings.canDrawOverlays(this)
         )
     }
 
@@ -193,9 +165,6 @@ class OnboardingActivity : AppCompatActivity() {
         AppPermission.NOTIFICATIONS -> R.string.perm_notifications_name
         AppPermission.BATTERY_OPTIMIZATION -> R.string.perm_battery_name
         AppPermission.OVERLAY -> R.string.perm_overlay_name
-        AppPermission.LOCATION -> R.string.perm_location_name
-        AppPermission.MICROPHONE -> R.string.perm_microphone_name
-        AppPermission.BLUETOOTH -> R.string.perm_bluetooth_name
     }
 
     private fun reasonRes(permission: AppPermission): Int = when (permission) {
@@ -203,8 +172,5 @@ class OnboardingActivity : AppCompatActivity() {
         AppPermission.NOTIFICATIONS -> R.string.perm_notifications_reason
         AppPermission.BATTERY_OPTIMIZATION -> R.string.perm_battery_reason
         AppPermission.OVERLAY -> R.string.perm_overlay_reason
-        AppPermission.LOCATION -> R.string.perm_location_reason
-        AppPermission.MICROPHONE -> R.string.perm_microphone_reason
-        AppPermission.BLUETOOTH -> R.string.perm_bluetooth_reason
     }
 }

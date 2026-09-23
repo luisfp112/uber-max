@@ -8,14 +8,13 @@ package com.ubermax.app.domain.model
  */
 enum class DecisionReason {
     LOW_FARE,
-    LOW_NET,
     LOW_PER_KM,
-    LOW_PER_HOUR,
     PICKUP_FAR,
+    PICKUP_TIME,
     TRIP_LONG,
+    TRIP_DISTANCE,
     LOW_RATING,
-    DEADHEAD,
-    BLACKLIST,
+    OUT_OF_PERIMETER,
     AUTO_ACCEPT_OFF
 }
 
@@ -38,15 +37,15 @@ object ReasonMapper {
         if (text.isEmpty()) return null
         return when {
             text.contains("tarifa baja", ignoreCase = true) -> DecisionReason.LOW_FARE
-            text.contains("ganancia neta", ignoreCase = true) -> DecisionReason.LOW_NET
             text.contains("\$/km bajo", ignoreCase = true) -> DecisionReason.LOW_PER_KM
-            text.contains("\$/hr", ignoreCase = true) -> DecisionReason.LOW_PER_HOUR
+            text.contains("recogida muy lejos", ignoreCase = true) -> DecisionReason.PICKUP_TIME
             text.contains("pickup lejos", ignoreCase = true) -> DecisionReason.PICKUP_FAR
+            text.contains("recorrido excede", ignoreCase = true) -> DecisionReason.TRIP_DISTANCE
             text.contains("viaje largo", ignoreCase = true) -> DecisionReason.TRIP_LONG
             text.contains("tiempo largo", ignoreCase = true) -> DecisionReason.TRIP_LONG
             text.contains("rating bajo", ignoreCase = true) -> DecisionReason.LOW_RATING
-            text.contains("vuelta vacía", ignoreCase = true) -> DecisionReason.DEADHEAD
-            text.contains("lista negra", ignoreCase = true) -> DecisionReason.BLACKLIST
+            text.contains("zona permitida", ignoreCase = true) -> DecisionReason.OUT_OF_PERIMETER
+            text.contains("perímetro urbano", ignoreCase = true) -> DecisionReason.OUT_OF_PERIMETER
             text.contains("auto-accept", ignoreCase = true) -> DecisionReason.AUTO_ACCEPT_OFF
             else -> null
         }

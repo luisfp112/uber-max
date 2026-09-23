@@ -1,30 +1,25 @@
 package com.ubermax.app.service
 
 import android.accessibilityservice.AccessibilityService
-import android.content.Intent
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import androidx.core.content.ContextCompat
 import com.ubermax.app.accessibility.ActionExecutor
 import com.ubermax.app.accessibility.OfferParser
-import com.ubermax.app.data.db.entity.BlacklistZoneEntity
-import com.ubermax.app.data.db.entity.FilterRulesEntity
 import com.ubermax.app.data.db.entity.AppSettingsEntity
-import com.ubermax.app.data.db.entity.TripLogEntity
+import com.ubermax.app.data.db.entity.FilterRulesEntity
 import com.ubermax.app.data.db.entity.VehicleConfigEntity
+import com.ubermax.app.data.geocoding.LocationIqGeocoder
 import com.ubermax.app.data.repository.ConfigRepository
-import com.ubermax.app.data.repository.TripRepository
+import com.ubermax.app.domain.geo.GeoJsonZones
+import com.ubermax.app.domain.geo.UrbanBoundary
 import com.ubermax.app.domain.model.Action
 import com.ubermax.app.domain.model.OfferData
 import com.ubermax.app.domain.model.OfferDecision
-import com.ubermax.app.domain.model.VoiceCommand
 import com.ubermax.app.domain.rules.RuleEngine
 import com.ubermax.app.domain.usecase.EvaluateOfferUseCase
-import com.ubermax.app.domain.ai.SmartAdvisor
 import com.ubermax.app.util.DecisionNotifier
 import com.ubermax.app.util.OfferFingerprint
-import com.ubermax.app.util.VoiceCommandBus
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -37,20 +32,18 @@ import javax.inject.Inject
  * Pipeline:
  * 1. Evento → findUberWindow() → rootNode
  * 2. OfferParser.parseOffer(rootNode) → OfferData
- * 3. EvaluateOfferUseCase → EvaluatedOffer
- * 4. RuleEngine → OfferDecision (ACCEPT / WARN / CANCEL)
- * 5. ActionExecutor:
+ * 3. (opcional) LocationIqGeocoder → coordenadas del destino
+ * 4. EvaluateOfferUseCase → EvaluatedOffer
+ * 5. RuleEngine → OfferDecision (ACCEPT / WARN)
+ * 6. ActionExecutor:
  *    - ACCEPT → clickAcceptButton() con retry
- *    - CANCEL → clickDismissButton() con retry
  *    - WARN   → no hacer nada, solo mostrar en HUD
- * 6. Emitir decisión al HUD via SharedFlow
+ * 7. Emitir decisión al HUD vía SharedFlow + anuncio de voz (TTS opcional)
  */
 @AndroidEntryPoint
 class UberAccessibilityService : AccessibilityService() {
 
     @Inject lateinit var configRepository: ConfigRepository
-    @Inject lateinit var tripRepository: TripRepository
-    @Inject lateinit var smartAdvisor: SmartAdvisor
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val parser = OfferParser()
@@ -63,16 +56,16 @@ class UberAccessibilityService : AccessibilityService() {
     private var lastOfferFingerprint = ""
     private var lastProcessedTime = 0L
 
-    // Resolución de resultados: id del último WARN/IGNORE que quedó sin acción
-    // (marcará TIMEOUT cuando llegue otra oferta o MANUAL_* vía voz).
-    private var lastPendingTimeoutId = 0L
-
     // Config cacheada
     private var vehicleConfig: VehicleConfigEntity = VehicleConfigEntity()
     private var filterRules: FilterRulesEntity = FilterRulesEntity()
-    private var blacklistKeywords: List<String> = emptyList()
-    private var blacklistZones: List<BlacklistZoneEntity> = emptyList()
     private var appSettings: AppSettingsEntity = AppSettingsEntity()
+
+    // Zonas permitidas del conductor (assets/zonas-permitidasv3.geojson).
+    // Se parsean una sola vez; si el asset falta o no es válido, se deja null
+    // y el filtro geográfico se omite (fail-open).
+    private var allowedZones: GeoJsonZones? = null
+    private var allowedZonesLoaded = false
 
     // False hasta que la configuración real del conductor se haya cargado al
     // menos una vez (no decidir con puros defaults en la primera oferta).
@@ -88,76 +81,56 @@ class UberAccessibilityService : AccessibilityService() {
         // Dedup por identidad de oferta: máxima antigüedad para re-ignorar la misma
         private const val DEDUP_MS = 10_000L
 
-        // Max reintentos para auto-accept y auto-cancel
+        // Max reintentos para auto-accept
         private const val MAX_ACTION_RETRIES = 5
         private const val RETRY_DELAY_MS = 300L
-
-        // Acción de simulación (SOLO debug, entregada vía SimulateOfferReceiver)
-        const val ACTION_SIMULATE_OFFER = "com.ubermax.app.SIMULATE_OFFER"
-        const val EXTRA_OFFER_INDEX = "offer_index"
-
-        // Ofertas de prueba realistas para ejercitar el pipeline en el HUD.
-        // Índice 0: rentable → ACCEPT · 1: tarifa baja → WARN · 2: viaje largo
-        private val SIMULATED_OFFERS: List<List<String>> = listOf(
-            listOf(
-                "UberX",
-                "\$10.00",
-                "★ 4.73 (42)",
-                "A 3 min (1.0 km)",
-                "Blvr. del Ejercito Nacional, TERMINAL DE BUSES",
-                "Viaje: 30 min (12.0 km)",
-                "C. L-7, CIUDAD MERLOT - SAN SALVADOR",
-                "Aceptar"
-            ),
-            listOf(
-                "UberX",
-                "\$1.20",
-                "⭐ 4.73 (42)",
-                "A 3 min (1.0 km)",
-                "Parque Central, AMBATO",
-                "Viaje: 20 min (8.0 km)",
-                "Calle 12 y Av. Bolívar, CIUDAD MERLOT",
-                "Postularse"
-            ),
-            listOf(
-                "Comfort",
-                "\$6.50",
-                "★ 4.2 (120)",
-                "A 12 min (5.0 km)",
-                "Urdesa Norte, GUAYAQUIL",
-                "Viaje: 45 min (25.0 km)",
-                "Vía a la Costa, Km 12, GUAYAQUIL",
-                "Aceptar"
-            )
-        )
 
         @Volatile
         var isRunning = false
             private set
+
+        // Instancia activa del servicio (debug). Usada SOLO por el simulador de
+        // tarjetas del source set debug, que inyecta una oferta en el pipeline real.
+        @Volatile
+        private var activeService: UberAccessibilityService? = null
 
         private val _decisionFlow = MutableSharedFlow<OfferDecision>(
             replay = 1,
             extraBufferCapacity = 5
         )
         val decisionFlow = _decisionFlow.asSharedFlow()
+
+        /**
+         * [DEBUG] Inyecta una oferta simulada en el pipeline real (parse → geocode →
+         * evaluación → reglas → HUD/TTS). Sin ventana de Uber: un ACCEPT solo se
+         * registrará en logs como "sin ventana real", sin pulsar nada en pantalla.
+         */
+        @JvmStatic
+        fun simulateOffer(offer: OfferData) {
+            val service = activeService ?: return
+            service.serviceScope.launch {
+                service.handleParsedOffer(offer, null)
+            }
+        }
     }
 
     override fun onCreate() {
         super.onCreate()
         actionExecutor = ActionExecutor(this)
-        observeVoiceCommands()
         Log.i(TAG, "🟢 UberMax AccessibilityService creado")
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         isRunning = true
+        activeService = this
         serviceScope.launch { loadConfig() }
         Log.i(TAG, "🟢 Servicio de accesibilidad conectado")
     }
 
     override fun onDestroy() {
         isRunning = false
+        activeService = null
         serviceScope.cancel()
         super.onDestroy()
         Log.i(TAG, "🔴 Servicio de accesibilidad detenido")
@@ -165,79 +138,6 @@ class UberAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         Log.w(TAG, "⚠️ Servicio interrumpido")
-    }
-
-    /** Escucha comandos de voz y los traduce a taps sobre la oferta visible. */
-    private fun observeVoiceCommands() {
-        serviceScope.launch {
-            VoiceCommandBus.commands.collect { command ->
-                handleVoiceCommand(command)
-            }
-        }
-    }
-
-    private suspend fun handleVoiceCommand(command: VoiceCommand) {
-        if (!appSettings.voiceControlEnabled) return
-        if (command == VoiceCommand.NEXT) {
-            Log.d(TAG, "🎙️ Voz: esperar")
-            return
-        }
-        val root = findUberWindow() ?: return
-        try {
-            when (command) {
-                VoiceCommand.ACCEPT -> {
-                    Log.i(TAG, "🎙️ Voz: aceptar")
-                    val applied = executeWithRetry("VOICE_ACCEPT") { actionExecutor.clickAcceptButton(root) }
-                    recordVoiceOverride(applied, "MANUAL_ACCEPT")
-                }
-                VoiceCommand.REJECT -> {
-                    Log.i(TAG, "🎙️ Voz: rechazar")
-                    val applied = executeWithRetry("VOICE_REJECT") { actionExecutor.clickDismissButton(root) }
-                    recordVoiceOverride(applied, "MANUAL_REJECT")
-                }
-                VoiceCommand.NEXT, VoiceCommand.NONE -> Unit
-            }
-        } finally {
-            root.recycle()
-        }
-    }
-
-    /** Registra que el conductor overrideó (por voz) la última oferta sin acción. */
-    private suspend fun recordVoiceOverride(applied: Boolean, resolution: String) {
-        val tripId = lastPendingTimeoutId
-        if (tripId == 0L) return
-        lastPendingTimeoutId = 0L
-        tripRepository.updateResolution(
-            tripId,
-            if (applied) resolution else "TAP_FAILED"
-        )
-    }
-
-    /** Si había una oferta WARN/IGNORE sin resolver y llegó otra, la primera expiró. */
-    private suspend fun flushPendingTimeout() {
-        val tripId = lastPendingTimeoutId
-        if (tripId == 0L) return
-        lastPendingTimeoutId = 0L
-        tripRepository.updateResolution(tripId, "TIMEOUT")
-    }
-
-    /** Arranca o detiene el servicio de voz según el ajuste del conductor. */
-    private fun syncVoiceService(settings: AppSettingsEntity) {
-        val shouldRun = settings.voiceControlEnabled
-        if (shouldRun == VoiceCommandService.isRunning) return
-        try {
-            val intent = Intent(this, VoiceCommandService::class.java).apply {
-                action = if (shouldRun) VoiceCommandService.ACTION_START
-                else VoiceCommandService.ACTION_STOP
-            }
-            if (shouldRun) {
-                ContextCompat.startForegroundService(this, intent)
-            } else {
-                startService(intent)
-            }
-        } catch (t: Throwable) {
-            Log.w(TAG, "No se pudo cambiar el servicio de voz: ${t.message}")
-        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -289,44 +189,12 @@ class UberAccessibilityService : AccessibilityService() {
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Hook de simulación (debug): un receptor inyecta una oferta de prueba.
-        if (intent?.action == ACTION_SIMULATE_OFFER) {
-            val index = intent.getIntExtra(EXTRA_OFFER_INDEX, 0)
-            serviceScope.launch { simulateOffer(index) }
-        }
-        return super.onStartCommand(intent, flags, startId)
-    }
-
-    /**
-     * Simula una oferta de prueba inyectada (solo debug / adb).
-     * Recorre el MISMO pipeline que una oferta real salvo que nunca habrá
-     * ventana de Uber Driver: en ACCEPT/CANCEL los taps se saltan (TAP_FAILED).
-     * En modo simulación (dry-run) tampoco hay taps, igual que en producción.
-     */
-    private suspend fun simulateOffer(index: Int) {
-        val texts = SIMULATED_OFFERS.getOrNull(index)
-        if (texts == null) {
-            Log.w(TAG, "🧪 Índice de oferta simulado inválido: $index")
-            return
-        }
-        val offer = parser.parseFromTextNodes(
-            texts.map { OfferParser.TextNode(text = it, contentDesc = "") }
-        )
-        if (offer == null) {
-            Log.w(TAG, "🧪 Oferta simulada no se pudo parsear")
-            return
-        }
-        Log.i(TAG, "🧪 SIMULANDO oferta de prueba $index: \$${offer.rawFare} → ${offer.destination}")
-        handleParsedOffer(offer, null)
-    }
-
     /**
      * Pipeline completo tras tener la oferta parseada: dedup por identidad,
-     * carga de config, evaluación, reglas, IA, emisión al HUD, feedback,
-     * acción (tap) y registro en el historial con resolución real.
+     * carga de config, geolocalización (opcional), evaluación, reglas, emisión
+     * al HUD, feedback de voz y acción (tap en ACCEPT).
      *
-     * @param uberRoot ventana de Uber Driver para los taps; null en simulación.
+     * @param uberRoot ventana de Uber Driver para los taps.
      */
     private suspend fun handleParsedOffer(offer: OfferData, uberRoot: AccessibilityNodeInfo?) {
         val now = System.currentTimeMillis()
@@ -340,10 +208,6 @@ class UberAccessibilityService : AccessibilityService() {
         lastOfferFingerprint = fingerprint
         lastProcessedTime = now
 
-        // Si la última oferta (WARN/IGNORE) quedó sin acción y llegó otra
-        // distinta, la anterior expiró (el conductor no actuó).
-        flushPendingTimeout()
-
         try {
             // 2. Recargar configuración (puede haber cambiado)
             if (!loadConfig()) {
@@ -351,98 +215,80 @@ class UberAccessibilityService : AccessibilityService() {
                 return
             }
 
-            // 3. Evaluar económicamente
-            val evaluated = evaluator.evaluate(
-                offer = offer,
-                config = vehicleConfig,
-                deadheadThresholdKm = filterRules.deadheadThresholdKm,
-                deadheadReturnFactor = filterRules.deadheadReturnFactor
-            )
-
-            // 4. Aplicar reglas del conductor
-            var decision = ruleEngine.evaluate(
-                evaluated = evaluated,
-                rules = filterRules,
-                blacklistKeywords = blacklistKeywords,
-                blacklistZones = blacklistZones
-            )
-
-            // 4.5 IA — Recomendación
-            if (filterRules.aiEnabled) {
-                val referenceProfitPerKm =
-                    if (appSettings.aiGoodProfitPerKm > 0.0) appSettings.aiGoodProfitPerKm
-                    else filterRules.minProfitPerKm
-                decision = smartAdvisor.analyzeOffer(decision, referenceProfitPerKm)
-            }
-
-            // 4.6 Modo simulación: marca la decisión pero no ejecuta taps
-            val simulated = appSettings.dryRunEnabled
-            val finalDecision = if (simulated) decision.copy(simulated = true) else decision
-
-            // 5. Emitir decisión al HUD
-            _decisionFlow.emit(finalDecision)
-
-            // 5.5 Feedback inmediato (notificación / vibración / sonido)
-            notifier.feedback(
-                decision = finalDecision,
-                notify = appSettings.notifyDecisions,
-                vibrate = appSettings.vibrateOnDecision,
-                sound = appSettings.soundOnDecision
-            )
-
-            // 6. Ejecutar acción (salvo en modo simulación)
-            var actionApplied = false
-            if (simulated) {
-                Log.i(TAG, "🧪 SIMULACIÓN — no se ejecuta acción (${decision.action})")
-            } else {
-                when (decision.action) {
-                    Action.ACCEPT -> {
-                        Log.i(TAG, "✅ AUTO-ACEPTANDO oferta: \$${offer.rawFare}")
-                        actionApplied = if (uberRoot != null) {
-                            executeWithRetry("ACCEPT") {
-                                actionExecutor.clickAcceptButton(uberRoot)
-                            }
-                        } else {
-                            Log.w(TAG, "⚠️ Sin ventana real de Uber (simulación) — TAP_FAILED")
-                            false
-                        }
-                    }
-                    Action.CANCEL -> {
-                        Log.i(TAG, "🚫 CANCELANDO oferta (BLACKLIST): ${decision.failedFilters}")
-                        actionApplied = if (uberRoot != null) {
-                            executeWithRetry("CANCEL") {
-                                actionExecutor.clickDismissButton(uberRoot)
-                            }
-                        } else {
-                            Log.w(TAG, "⚠️ Sin ventana real de Uber (simulación) — TAP_FAILED")
-                            false
-                        }
-                    }
-                    Action.WARN -> {
-                        Log.i(TAG, "⚠️ ADVERTENCIA — no recomendable: ${decision.failedFilters}")
-                        // No hacer nada — el conductor ve el aviso en el HUD y decide
-                    }
-                    Action.IGNORE -> {
-                        Log.d(TAG, "⏳ IGNORANDO — dejando correr temporizador")
+            // 2.5 Geolocalizar RECOGIDA y DESTINO si el conductor activó las zonas
+            // permitidas (el perímetro protege una geografía completa, no solo el
+            // destino). Geocoding oportunista: si la tarjeta ya trae coordenadas se
+            // usan esas. Fail-open: si no hay key, no hay red o un punto no se
+            // verifica con LocationIQ, ese punto queda sin coordenadas y RuleEngine
+            // lo traduce a un WARN "no confirmado" (jamás auto-acepta la zona).
+            val geoActive = appSettings.geoCheckEnabled && appSettings.geoApiKey.isNotBlank()
+            var offer = offer
+            var pickupLocated = true
+            var destinationLocated = true
+            if (geoActive) {
+                val apiKey = appSettings.geoApiKey
+                if (offer.pickupLatLng == null) {
+                    val coords = LocationIqGeocoder.geocode(offer.pickupAddress, apiKey)
+                    if (coords != null) {
+                        offer = offer.copy(pickupLatLng = coords)
+                        Log.i(TAG, "📥 Recogida geolocalizada: ${coords.first}, ${coords.second}")
                     }
                 }
+                if (offer.destinationLatLng == null) {
+                    val coords = LocationIqGeocoder.geocode(offer.destination, apiKey)
+                    if (coords != null) {
+                        offer = offer.copy(destinationLatLng = coords)
+                        Log.i(TAG, "📍 Destino geolocalizado: ${coords.first}, ${coords.second}")
+                    }
+                }
+                pickupLocated = offer.pickupLatLng != null
+                destinationLocated = offer.destinationLatLng != null
             }
 
-            // 7. Guardar en historial (decisión + resultado real de la acción)
-            val resolution = when {
-                simulated -> "UNKNOWN"
-                decision.action == Action.WARN || decision.action == Action.IGNORE -> "UNKNOWN"
-                actionApplied && decision.action == Action.ACCEPT -> "ASSIGNED"
-                actionApplied && decision.action == Action.CANCEL -> "REJECTED"
-                else -> "TAP_FAILED"
-            }
-            val tripId = logTrip(finalDecision, actionApplied, resolution)
+            // 3. Evaluar económicamente
+            val evaluated = evaluator.evaluate(offer = offer, config = vehicleConfig)
 
-            // Si la oferta no tuvo acción automática (WARN/IGNORE), queda en
-            // espera: a la próxima oferta distinta se marcará TIMEOUT, y si el
-            // conductor la acepta/rechaza por voz se marcará MANUAL_*.
-            if (decision.action == Action.WARN || decision.action == Action.IGNORE) {
-                lastPendingTimeoutId = tripId
+            // 3.5 Zona permitida de destino: los polígonos del GeoJSON del
+            // conductor. Sin GeoJSON válido → null (fail-open, se omite el filtro).
+            val boundary: UrbanBoundary? = if (geoActive) allowedZones else null
+
+            // 4. Aplicar reglas del conductor
+            val decision = ruleEngine.evaluate(
+                evaluated = evaluated,
+                rules = filterRules,
+                avgSpeedKmh = vehicleConfig.avgSpeedKmh,
+                boundary = boundary
+            )
+
+            // 5. Emitir decisión al HUD
+            _decisionFlow.emit(decision)
+
+            // 5.5 Feedback por voz (TTS, opt-in). Si la recogida o el destino no se
+            // pudieron geolocalizar, la voz los anuncia antes de la decisión
+            // ("Recogida no ubicada" / "Destino no ubicado").
+            notifier.feedback(
+                decision = decision,
+                speak = appSettings.voiceAnnounceEnabled,
+                pickupLocated = pickupLocated,
+                destinationLocated = destinationLocated
+            )
+
+            // 6. Ejecutar acción
+            when (decision.action) {
+                Action.ACCEPT -> {
+                    Log.i(TAG, "✅ AUTO-ACEPTANDO oferta: \$${offer.rawFare}")
+                    if (uberRoot != null) {
+                        executeWithRetry("ACCEPT") {
+                            actionExecutor.clickAcceptButton(uberRoot)
+                        }
+                    } else {
+                        Log.w(TAG, "⚠️ Sin ventana real de Uber — TAP_FAILED")
+                    }
+                }
+                Action.WARN -> {
+                    Log.i(TAG, "⚠️ ADVERTENCIA — no recomendable: ${decision.failedFilters}")
+                    // No hacer nada — el conductor ve el aviso en el HUD y decide
+                }
             }
 
         } catch (c: CancellationException) {
@@ -512,7 +358,7 @@ class UberAccessibilityService : AccessibilityService() {
         return null
     }
 
-/**
+    /**
      * Carga la configuración completa de forma síncrona (suspend).
      *
      * @return true si hay una configuración cargada (la primera vez, o una
@@ -524,20 +370,19 @@ class UberAccessibilityService : AccessibilityService() {
             // Se lee TODO primero y solo se publica si carga completa...
             val vc = configRepository.getVehicleConfig()
             val fr = configRepository.getFilterRules()
-            val keywords = configRepository.getAllMergedBlacklistKeywords()
-            val zones = configRepository.getAllBlacklistZones()
             val settings = configRepository.getAppSettings()
 
             // ...para que un fallo a mitad de camino no mezcle config nueva con vieja.
             vehicleConfig = vc
             filterRules = fr
-            blacklistKeywords = keywords
-            blacklistZones = zones
             appSettings = settings
             configLoaded = true
 
-            // Sincronizar servicio de voz con el ajuste actual
-            syncVoiceService(settings)
+            // El executor se crea (o recrea) con el ajuste de taps humanizados
+            actionExecutor = ActionExecutor(this@UberAccessibilityService, appSettings.humanTapsEnabled)
+
+            // Cargar las zonas permitidas del GeoJSON una sola vez
+            loadAllowedZonesOnce()
             true
         } catch (c: CancellationException) {
             throw c
@@ -550,22 +395,25 @@ class UberAccessibilityService : AccessibilityService() {
         }
     }
 
-    private suspend fun logTrip(
-        decision: OfferDecision,
-        actionApplied: Boolean = false,
-        resolution: String = "UNKNOWN"
-    ): Long = withContext(Dispatchers.IO) {
-        try {
-            tripRepository.logDecision(
-                decision = decision,
-                actionApplied = actionApplied,
-                resolution = resolution
-            )
-        } catch (c: CancellationException) {
-            throw c
+    /**
+     * Carga una sola vez las zonas permitidas desde `assets/zonas-permitidasv3.geojson`.
+     * Si el asset falta o no es un GeoJSON válido, [allowedZones] queda null y el
+     * filtro geográfico se omite (fail-open, nunca bloquea por esto).
+     * Debe llamarse desde un contexto IO.
+     */
+    private fun loadAllowedZonesOnce() {
+        if (allowedZonesLoaded) return
+        allowedZonesLoaded = true
+        allowedZones = try {
+            val raw = assets.open(GeoJsonZones.ASSET_NAME)
+                .bufferedReader(Charsets.UTF_8)
+                .use { it.readText() }
+            GeoJsonZones.parse(raw).also {
+                if (it != null) Log.i(TAG, "🗺️ Zonas permitidas cargadas (${GeoJsonZones.ASSET_NAME})")
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error guardando trip: ${e.message}")
-            0L
+            Log.w(TAG, "No se pudo cargar ${GeoJsonZones.ASSET_NAME}; el filtro geográfico se omite. ${e.message}")
+            null
         }
     }
 }

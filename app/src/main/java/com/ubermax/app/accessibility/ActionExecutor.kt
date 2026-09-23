@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.graphics.Rect
+import com.ubermax.app.util.HumanTapTiming
 import com.ubermax.app.util.Logs
 import com.ubermax.app.util.TextNormalizer
 import android.view.accessibility.AccessibilityNodeInfo
@@ -38,7 +39,8 @@ import kotlin.coroutines.resume
  * se devuelve false para que el llamador reintente (no basta con cambiar el HUD).
  */
 class ActionExecutor(
-    private val service: AccessibilityService
+    private val service: AccessibilityService,
+    private val humanTapsEnabled: Boolean = true
 ) {
 
     companion object {
@@ -99,6 +101,9 @@ class ActionExecutor(
         // Max reintentos y verificación post-acción
         private const val VERIFY_DELAY_MS = 400L
         private const val MAX_PARENT_DEPTH = 5
+
+        // Duración del trazo sin humanización (legacy)
+        private const val STROKE_FIXED_MS = 100L
     }
 
     // ═══════════════════════════════════════════════════════
@@ -112,6 +117,7 @@ class ActionExecutor(
      */
     suspend fun clickAcceptButton(rootNode: AccessibilityNodeInfo?): Boolean {
         if (rootNode == null) return false
+        humanizeDelayIfEnabled()
 
         // Estrategia 1-3: encontrar el botón (por texto/desc) y tocarlo de verdad
         val acceptNode = findActionNode(rootNode, ::matchesAcceptText)
@@ -150,6 +156,7 @@ class ActionExecutor(
      */
     suspend fun clickDismissButton(rootNode: AccessibilityNodeInfo?): Boolean {
         if (rootNode == null) return false
+        humanizeDelayIfEnabled()
 
         // Estrategia 1: contentDescription/texto
         val dismissNode = findActionNode(rootNode, ::matchesDismissText)
@@ -545,9 +552,16 @@ class ActionExecutor(
      * el callback asíncrono en una función suspend.
      */
     private suspend fun tryGestureWithCallback(x: Float, y: Float): Boolean {
-        val path = Path().apply { moveTo(x, y) }
+        val (jx, jy) = jitterAndClamp(x, y)
+        val path = Path().apply { moveTo(jx, jy) }
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
+            .addStroke(
+                GestureDescription.StrokeDescription(
+                    path,
+                    0,
+                    if (humanTapsEnabled) HumanTapTiming.strokeDuration() else STROKE_FIXED_MS
+                )
+            )
             .build()
 
         return suspendCancellableCoroutine { continuation ->
@@ -593,6 +607,24 @@ class ActionExecutor(
     private fun clampToScreen(x: Int, y: Int): Pair<Int, Int> {
         val m = ResourcesCompat.displayMetrics()
         return x.coerceIn(0, m.widthPixels) to y.coerceIn(0, m.heightPixels)
+    }
+
+    /**
+     * Retardo de "reacción humana" (gaussiano) antes del gesto, solo cuando
+     * [humanTapsEnabled]. Un único delay por acción.
+     */
+    private suspend fun humanizeDelayIfEnabled() {
+        if (!humanTapsEnabled) return
+        val delayMs = HumanTapTiming.gaussianDelay()
+        Logs.d(TAG, "🤖 Retardo humanizado de ${delayMs}ms antes del toque")
+        delay(delayMs)
+    }
+
+    /** Aplica el jitter (si está activo) y recorta el punto a la pantalla. */
+    private fun jitterAndClamp(x: Float, y: Float): Pair<Float, Float> {
+        val (jx, jy) = if (humanTapsEnabled) HumanTapTiming.jitterPoint(x, y) else x to y
+        val m = ResourcesCompat.displayMetrics()
+        return jx.coerceIn(0f, m.widthPixels.toFloat()) to jy.coerceIn(0f, m.heightPixels.toFloat())
     }
 }
 

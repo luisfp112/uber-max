@@ -14,6 +14,9 @@ import androidx.room.PrimaryKey
  *
  * O ingresarse directamente manualmente (manualCostPerKm > 0).
  *
+ * La tarjeta de Uber muestra el monto neto ya descontada la comisión de la
+ * plataforma, por lo que ya no se modela ningún descuento aquí.
+ *
  * Si el conductor no configura el consumo, se usa un costo
  * por defecto razonable (DEFAULT_COST_PER_KM).
  */
@@ -50,14 +53,6 @@ data class VehicleConfigEntity(
 
     @ColumnInfo(name = "engine_idle_cost_per_hour")
     val engineIdleCostPerHour: Double = 0.20,
-
-    /**
-     * Comisión que retiene la plataforma (%). Se descuenta de la tarifa bruta
-     * antes de calcular la ganancia neta. 0 = sin comisión.
-     * Valor real de la plataforma: 9%.
-     */
-    @ColumnInfo(name = "platform_commission_percent")
-    val platformCommissionPercent: Double = 9.0,
 
     // ── Costo por km manual (0 = usar cálculo automático) ──
 

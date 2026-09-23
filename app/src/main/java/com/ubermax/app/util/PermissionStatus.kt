@@ -12,10 +12,7 @@ enum class AppPermission {
     ACCESSIBILITY,
     NOTIFICATIONS,
     BATTERY_OPTIMIZATION,
-    OVERLAY,
-    LOCATION,
-    MICROPHONE,
-    BLUETOOTH
+    OVERLAY
 }
 
 /** Foto del estado actual de cada permiso relevante. */
@@ -23,10 +20,7 @@ data class PermissionSnapshot(
     val accessibility: Boolean = false,
     val notifications: Boolean = false,
     val batteryOptimizationIgnored: Boolean = false,
-    val overlay: Boolean = false,
-    val location: Boolean = false,
-    val microphone: Boolean = false,
-    val bluetooth: Boolean = false
+    val overlay: Boolean = false
 )
 
 /** Un permiso con su estado y si es obligatorio para operar. */
@@ -38,38 +32,20 @@ data class PermissionItem(
 
 object PermissionStatus {
 
-    /**
-     * Checklist ordenado por importancia. [requireVoice] y [requireBluetooth] sólo
-     * vuelven obligatorios el micrófono / Bluetooth cuando el usuario activó voz o
-     * auto-arranque por Bluetooth.
-     */
-    fun checklist(
-        snapshot: PermissionSnapshot,
-        requireVoice: Boolean = false,
-        requireBluetooth: Boolean = false
-    ): List<PermissionItem> = listOf(
+    /** Checklist ordenado por importancia. Todos los permisos son obligatorios. */
+    fun checklist(snapshot: PermissionSnapshot): List<PermissionItem> = listOf(
         PermissionItem(AppPermission.ACCESSIBILITY, snapshot.accessibility, required = true),
         PermissionItem(AppPermission.NOTIFICATIONS, snapshot.notifications, required = true),
         PermissionItem(AppPermission.BATTERY_OPTIMIZATION, snapshot.batteryOptimizationIgnored, required = true),
-        PermissionItem(AppPermission.OVERLAY, snapshot.overlay, required = true),
-        PermissionItem(AppPermission.LOCATION, snapshot.location, required = false),
-        PermissionItem(AppPermission.MICROPHONE, snapshot.microphone, required = requireVoice),
-        PermissionItem(AppPermission.BLUETOOTH, snapshot.bluetooth, required = requireBluetooth)
+        PermissionItem(AppPermission.OVERLAY, snapshot.overlay, required = true)
     )
 
     /** Permisos obligatorios que aún no están concedidos. */
-    fun missingRequired(
-        snapshot: PermissionSnapshot,
-        requireVoice: Boolean = false,
-        requireBluetooth: Boolean = false
-    ): List<AppPermission> = checklist(snapshot, requireVoice, requireBluetooth)
-        .filter { it.required && !it.granted }
-        .map { it.permission }
+    fun missingRequired(snapshot: PermissionSnapshot): List<AppPermission> =
+        checklist(snapshot)
+            .filter { it.required && !it.granted }
+            .map { it.permission }
 
     /** `true` si no falta ningún permiso obligatorio. */
-    fun isReady(
-        snapshot: PermissionSnapshot,
-        requireVoice: Boolean = false,
-        requireBluetooth: Boolean = false
-    ): Boolean = missingRequired(snapshot, requireVoice, requireBluetooth).isEmpty()
+    fun isReady(snapshot: PermissionSnapshot): Boolean = missingRequired(snapshot).isEmpty()
 }

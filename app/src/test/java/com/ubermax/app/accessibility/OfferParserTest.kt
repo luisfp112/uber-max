@@ -28,8 +28,7 @@ class OfferParserTest {
     private val evaluator = EvaluateOfferUseCase()
     private val ruleEngine = RuleEngine()
     private val vehicle = VehicleConfigEntity(
-        manualCostPerKm = 0.08, // costPerKm manual = $0.08 USD
-        platformCommissionPercent = 0.0 // comisión: 0 para cuentas exactas de deadhead
+        manualCostPerKm = 0.08 // costPerKm manual = $0.08 USD
     )
 
     // ═══════════════════════════════════════════════════════
@@ -204,6 +203,44 @@ class OfferParserTest {
         assertFalse(offer.destination.contains("Postular", ignoreCase = true))
     }
 
+    @Test
+    fun `destino contaminado con textos de pantalla se normaliza a 2 segmentos`() {
+        // Audit real: el parser no se detiene en el nodo de destino y concatena
+        // alertas de batería, banners de Radar y estado de conexión. AddressSanitizer
+        // corta la cola y descarta las frases de UI.
+        val nodes = nodesOf(
+            "UberX", "\$8.40", "★ 4.92 (120)",
+            "A 4 min (1.0 km)", "Parque Central, AMBATO",
+            "Viaje: 20 min (8.0 km)",
+            "Alaska, Huachi Grande, No es posible desconectarse, Buscando solicitud de viaje...",
+            "Radar de solicitud de viaje, 2-7 min"
+        )
+
+        val offer = parser.parseFromTextNodes(nodes)
+
+        assertNotNull(offer)
+        assertEquals("Alaska, Huachi Grande", offer!!.destination)
+        assertFalse(offer.destination.contains("desconectarse", ignoreCase = true))
+        assertFalse(offer.destination.contains("solicitud", ignoreCase = true))
+        assertFalse(offer.destination.contains("Radar", ignoreCase = true))
+        assertFalse(offer.destination.contains("2-7 min"))
+    }
+
+    @Test
+    fun `el segundo segmento de UI descarta la parroquia en el destino`() {
+        val nodes = nodesOf(
+            "UberX", "\$8.40", "★ 4.92 (120)",
+            "A 4 min (1.0 km)", "Pickup",
+            "Viaje: 20 min (8.0 km)",
+            "C. Rocafuerte 3y, Radar de solicitud de viaje, 2-7 min"
+        )
+
+        val offer = parser.parseFromTextNodes(nodes)
+
+        assertNotNull(offer)
+        assertEquals("C. Rocafuerte 3y", offer!!.destination)
+    }
+
     // ═══════════════════════════════════════════════════════
     //  PARSE — Rechazos
     // ═══════════════════════════════════════════════════════
@@ -341,7 +378,7 @@ class OfferParserTest {
         val offer = parser.parseFromTextNodes(nodesOf(*assignedOfferTexts().toTypedArray()))!!
         val evaluated = evaluator.evaluate(offer, vehicle)
         val decision = ruleEngine.evaluate(
-            evaluated, FilterRulesEntity(), emptyList(), emptyList()
+            evaluated, FilterRulesEntity()
         )
 
         assertEquals(Action.ACCEPT, decision.action)
@@ -356,7 +393,7 @@ class OfferParserTest {
             nodesOf(*openOfferViajeDisponibleTexts().toTypedArray())
         )!!
         val decision = ruleEngine.evaluate(
-            evaluator.evaluate(offer, vehicle), FilterRulesEntity(), emptyList(), emptyList()
+            evaluator.evaluate(offer, vehicle), FilterRulesEntity()
         )
 
         assertEquals(Action.ACCEPT, decision.action)
@@ -368,7 +405,7 @@ class OfferParserTest {
             nodesOf(*openOfferPostularseTexts().toTypedArray())
         )!!
         val decision = ruleEngine.evaluate(
-            evaluator.evaluate(offer, vehicle), FilterRulesEntity(), emptyList(), emptyList()
+            evaluator.evaluate(offer, vehicle), FilterRulesEntity()
         )
 
         assertEquals(Action.ACCEPT, decision.action)
@@ -380,36 +417,10 @@ class OfferParserTest {
             nodesOf(*openOfferMeInteresaTexts().toTypedArray())
         )!!
         val decision = ruleEngine.evaluate(
-            evaluator.evaluate(offer, vehicle), FilterRulesEntity(), emptyList(), emptyList()
+            evaluator.evaluate(offer, vehicle), FilterRulesEntity()
         )
 
         assertEquals(Action.ACCEPT, decision.action)
-    }
-
-    @Test
-    fun `viaje largo aplica penalizacion por vuelta vacia cuando el factor esta activo`() {
-        val offer = parser.parseFromTextNodes(nodesOf(*assignedOfferTexts().toTypedArray()))!!
-        // factor activo (1.0): vuelta vacía con rampa desde 8km → 12km * 1.0 * ((12-8)/8) = 6km
-        val evaluated = evaluator.evaluate(
-            offer, vehicle, deadheadThresholdKm = 8.0, deadheadReturnFactor = 1.0
-        )
-
-        assertTrue(evaluated.hasDeadheadPenalty) // trip > 8km
-        assertEquals(6.0, evaluated.returnKm, 0.001)
-        assertEquals(19.0, evaluated.totalKm, 0.001) // 1 + 12 + 6 de retorno
-    }
-
-    @Test
-    fun `viaje largo sin factor activo no aplica vuelta vacia`() {
-        val offer = parser.parseFromTextNodes(nodesOf(*assignedOfferTexts().toTypedArray()))!!
-        // factor por defecto 0.0 → deadhead desactivado (el conductor debe habitarlo)
-        val evaluated = evaluator.evaluate(
-            offer, vehicle, deadheadThresholdKm = 8.0, deadheadReturnFactor = 0.0
-        )
-
-        assertFalse(evaluated.hasDeadheadPenalty)
-        assertEquals(0.0, evaluated.returnKm, 0.001)
-        assertEquals(13.0, evaluated.totalKm, 0.001) // 1 + 12, sin retorno
     }
 
     @Test
@@ -420,7 +431,7 @@ class OfferParserTest {
         )
         val offer = parser.parseFromTextNodes(nodes)!!
         val decision = ruleEngine.evaluate(
-            evaluator.evaluate(offer, vehicle), FilterRulesEntity(minFare = 1.50), emptyList(), emptyList()
+            evaluator.evaluate(offer, vehicle), FilterRulesEntity(minFare = 1.50)
         )
 
         assertEquals(Action.WARN, decision.action)
@@ -428,55 +439,11 @@ class OfferParserTest {
     }
 
     @Test
-    fun `destino en lista negra por keyword genera CANCEL`() {
-        val nodes = listOf(
-            OfferParser.TextNode("UberX", ""),
-            OfferParser.TextNode("\$12.00", ""),
-            OfferParser.TextNode("★ 4.9 (30)", ""),
-            OfferParser.TextNode("A 2 min (0.5 km)", ""),
-            OfferParser.TextNode("Alamos", ""),
-            OfferParser.TextNode("Viaje: 15 min (6.0 km)", ""),
-            OfferParser.TextNode("Av. Peligro, Sector Rojo", ""),
-            OfferParser.TextNode("Aceptar", "")
-        )
-        val offer = parser.parseFromTextNodes(nodes)!!
-        val decision = ruleEngine.evaluate(
-            evaluator.evaluate(offer, vehicle),
-            FilterRulesEntity(), // blacklistEnabled = true por defecto
-            blacklistKeywords = listOf("peligro"),
-            blacklistZones = emptyList()
-        )
-
-        assertEquals(Action.CANCEL, decision.action)
-        assertTrue(decision.failedFilters.any { it.contains("LISTA NEGRA") })
-        assertEquals("Av. Peligro, Sector Rojo", offer.destination)
-    }
-
-    @Test
-    fun `destino en lista negra por zona del mapa genera CANCEL`() {
-        val offer = parser.parseFromTextNodes(
-            nodesOf(*openOfferPostularseTexts().toTypedArray())
-        )!!
-        val escalonZone = com.ubermax.app.data.db.entity.BlacklistZoneEntity(
-            name = "escalón",
-            polygonJson = """[[13.6900,-89.1900],[13.7000,-89.1900],[13.7000,-89.1800],[13.6900,-89.1800]]"""
-        )
-        val decision = ruleEngine.evaluate(
-            evaluator.evaluate(offer, vehicle),
-            FilterRulesEntity(),
-            blacklistKeywords = emptyList(),
-            blacklistZones = listOf(escalonZone)
-        )
-
-        assertEquals(Action.CANCEL, decision.action)
-    }
-
-    @Test
-    fun `con auto-aceptar desactivado una foda buena pasa a WARN informativo`() {
+    fun `con auto-aceptar desactivado una oferta buena pasa a WARN informativo`() {
         val offer = parser.parseFromTextNodes(nodesOf(*assignedOfferTexts().toTypedArray()))!!
         val rules = FilterRulesEntity(autoAcceptEnabled = false)
         val decision = ruleEngine.evaluate(
-            evaluator.evaluate(offer, vehicle), rules, emptyList(), emptyList()
+            evaluator.evaluate(offer, vehicle), rules
         )
 
         assertEquals(Action.WARN, decision.action)

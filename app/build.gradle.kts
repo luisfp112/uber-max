@@ -22,17 +22,12 @@ android {
         applicationId = "com.ubermax.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
         // Versionado: versionCode único por release y versionName en SemVer (X.Y.Z).
         // Cada release va etiquetado en git como v<versionName> (ver README -> Versionado).
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Room schema export for migrations
-        ksp {
-            arg("room.schemaLocation", "$projectDir/schemas")
-        }
     }
 
     signingConfigs {
@@ -109,14 +104,6 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-
-    // DataStore Preferences
-    implementation(libs.androidx.datastore.preferences)
-
-    // OSMDroid (mapa gratuito OpenStreetMap, sin API key) + Localización
-    implementation(libs.osmdroid.android)
-    implementation(libs.play.services.location)
-    implementation(libs.okhttp)
 
     // Testing
     testImplementation(libs.junit)

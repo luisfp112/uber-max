@@ -7,26 +7,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission
-        android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30" />
 
     <!-- Visibilidad de paquetes en Android 11+ (para abrir/consultar Uber Driver) -->
     <queries>
         <package android:name="com.ubercab.driver" />
-        <intent>
-            <action android:name="android.speech.RecognitionService" />
-        </intent>
     </queries>
 
     <application
@@ -65,20 +53,6 @@
             android:parentActivityName=".ui.dashboard.DashboardActivity"
             android:theme="@style/Theme.UberMax" />
 
-        <!-- Historial -->
-        <activity
-            android:name=".ui.history.HistoryActivity"
-            android:exported="false"
-            android:parentActivityName=".ui.dashboard.DashboardActivity"
-            android:theme="@style/Theme.UberMax" />
-
-        <!-- Blacklist Map -->
-        <activity
-            android:name=".ui.blacklist.BlacklistMapActivity"
-            android:exported="false"
-            android:parentActivityName=".ui.settings.SettingsActivity"
-            android:theme="@style/Theme.UberMax" />
-
         <!-- Accessibility Service -->
         <service
             android:name=".service.UberAccessibilityService"
@@ -112,38 +86,7 @@
                 android:value="HUD flotante con la última decision de UberMax" />
         </service>
 
-        <!-- Control por voz (opt-in) -->
-        <service
-            android:name=".service.VoiceCommandService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Reconocimiento de voz para aceptar o rechazar ofertas" />
-        </service>
-
-        <!-- Auto-arranque tras reiniciar -->
-        <receiver
-            android:name=".service.BootReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Auto-arranque al conectar Bluetooth de auto -->
-        <receiver
-            android:name=".service.CarConnectionReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Compartir exportaciones CSV -->
+        <!-- Compartir backup de configuración -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

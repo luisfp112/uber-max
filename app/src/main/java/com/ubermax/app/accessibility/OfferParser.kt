@@ -1,6 +1,7 @@
 package com.ubermax.app.accessibility
 
 import android.graphics.Rect
+import com.ubermax.app.util.AddressSanitizer
 import com.ubermax.app.util.Logs
 import android.view.accessibility.AccessibilityNodeInfo
 import com.ubermax.app.domain.model.OfferData
@@ -237,8 +238,15 @@ class OfferParser {
         val (passengerRating, passengerTrips, passengerHasRating) = extractRating(nodes)
 
         // ── Extraer direcciones ──
+        // El destino se sanea (regla de 2 segmentos de Ambato): el parser no se
+        // detiene en el nodo de destino y a veces concatena textos inferiores de
+        // la pantalla (batería, banners de Radar, Uber Pro, sugerencias...).
+        // AddressSanitizer corta la cola y descarta frases de UI, de modo que
+        // OfferData/fingerprint/geocoder reciben solo "[calle], [parroquia]".
         val pickupAddress = extractAddressAfterNode(nodes, pickupNodeIndex, tripNodeIndex)
-        val destination = extractAddressAfterNode(nodes, tripNodeIndex, nodes.size)
+        val destination = AddressSanitizer.sanitize(
+            extractAddressAfterNode(nodes, tripNodeIndex, nodes.size)
+        ).normalized
 
         // ── Coordenadas oportunistas: si la tarjeta expone pares lat/lng ──
         val (pickupCoords, destCoords) = extractCoordinates(nodes)
